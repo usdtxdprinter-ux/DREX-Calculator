@@ -71,8 +71,16 @@ BRAND_SECONDARY = "#234699"  # Pantone 7686C
 BRAND_ACCENT = "#b11f33"  # Pantone 187C
 BRAND_GRAY = "#97999b"  # Cool Gray 7C
 
-def plot_fan_and_system_curves(selected_fan_model, required_cfm, required_sp):
-    """Generate fan curve and system curve plot"""
+def plot_fan_and_system_curves(selected_fan_model, required_cfm, total_system_sp, manifold_sp):
+    """
+    Generate fan curve and system curve plot
+    
+    Args:
+        selected_fan_model: DEF fan model name
+        required_cfm: Total system CFM
+        total_system_sp: Total system pressure (for operating point marker)
+        manifold_sp: Manifold pressure only (for system curve calculation)
+    """
     fig, ax = plt.subplots(figsize=(10, 6))
     
     # Plot fan curve
@@ -80,15 +88,15 @@ def plot_fan_and_system_curves(selected_fan_model, required_cfm, required_sp):
     ax.plot(fan_data['CFM'], fan_data['SP'], 'b-', linewidth=2.5, label=f'{selected_fan_model} Fan Curve', color=BRAND_SECONDARY)
     ax.scatter(fan_data['CFM'], fan_data['SP'], color=BRAND_SECONDARY, s=60, zorder=5, edgecolors='white', linewidths=1.5)
     
-    # Plot system curve (parabolic: SP = k * CFM^2)
-    k = required_sp / (required_cfm ** 2) if required_cfm > 0 else 0
+    # Plot system curve using MANIFOLD PRESSURE ONLY (parabolic: SP = k * CFM^2)
+    k = manifold_sp / (required_cfm ** 2) if required_cfm > 0 else 0
     cfm_range = np.linspace(0, max(fan_data['CFM']) * 1.1, 100)
     system_curve = k * (cfm_range ** 2)
-    ax.plot(cfm_range, system_curve, '--', linewidth=2.5, label='System Curve', color=BRAND_ACCENT)
+    ax.plot(cfm_range, system_curve, '--', linewidth=2.5, label='System Curve (Manifold Only)', color=BRAND_ACCENT)
     
-    # Mark operating point
-    ax.scatter([required_cfm], [required_sp], color='#00a86b', s=250, marker='*', 
-               zorder=10, label=f'Operating Point\n({required_cfm:.0f} CFM @ {required_sp:.2f}" WC)',
+    # Mark operating point (using total system pressure)
+    ax.scatter([required_cfm], [total_system_sp], color='#00a86b', s=250, marker='*', 
+               zorder=10, label=f'Operating Point\n({required_cfm:.0f} CFM @ {total_system_sp:.2f}" WC)',
                edgecolors='white', linewidths=2)
     
     # Formatting
@@ -1109,7 +1117,8 @@ def show_results_screen():
             fig = plot_fan_and_system_curves(
                 fan['model'],
                 results['total_cfm'],
-                results['total_system_dp']
+                results['total_system_dp'],
+                results['manifold_dp']  # Manifold pressure only for system curve
             )
             st.pyplot(fig)
             plt.close()
