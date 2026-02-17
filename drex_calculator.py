@@ -247,142 +247,6 @@ def select_def_fan(required_cfm, required_sp):
     
     return suitable_fans
 
-def generate_gamma_outline(project_info, dryers, manifold_info, results):
-    """Generate professional report outline for Gamma.app"""
-    
-    # Build content for Gamma
-    outline = f"""# DREX Dryer Exhaust System Report
-## {project_info.get('name', 'Commercial Dryer Exhaust System')}
-
-*Prepared by LF Systems - A Division of RM Manifold Group Inc.*
-
----
-
-## Executive Summary
-
-**Project Details:**
-- Location: {project_info.get('city', 'N/A')}, {project_info.get('state', 'N/A')}
-- Elevation: {project_info.get('elevation', 'N/A')} feet
-- Prepared by: {project_info.get('user_name', 'N/A')}
-- Date: {datetime.now().strftime('%B %d, %Y')}
-
-**System Overview:**
-- Total System CFM: **{results['total_cfm']:.0f} CFM**
-- Manifold Diameter: **{manifold_info['diameter']}"**
-- Total System Pressure Loss: **{results['total_system_dp']:.3f} IN WC**
-- Recommended Fan: **{results['selected_fan']['model'] if results['selected_fan'] else 'TBD'}**
-
----
-
-## Dryer Configuration
-
-**{len(dryers)} Dryers Connected:**
-"""
-    
-    for idx, dryer in enumerate(dryers, 1):
-        outline += f"\n{idx}. **Dryer #{idx}**: {dryer['cfm']} CFM @ {dryer['outlet_diameter']}\" outlet"
-        outline += f"\n   - Connector: {dryer['connector_length']}' long"
-        outline += f"\n   - Pressure Loss: {dryer['connector_dp']:.3f} IN WC"
-    
-    outline += f"""
-
----
-
-## Manifold System
-
-**Specifications:**
-- Total Length: {manifold_info['length']} feet
-- Diameter: {manifold_info['diameter']}"
-- Fittings: {manifold_info['fittings_summary']}
-- Velocity: {results['manifold_velocity']:.0f} FPM
-- Pressure Loss: {results['manifold_dp']:.3f} IN WC
-
-**Design Criteria:**
-- Maximum Manifold Loss: 1.0 IN WC
-- Status: {"✅ PASS" if results['manifold_dp'] <= MANIFOLD_MAX_DP else "❌ EXCEEDS LIMIT"}
-
----
-
-## Pressure Loss Analysis
-
-**System Breakdown:**
-"""
-    
-    outline += f"\n- Worst Connector Loss: {results['worst_connector_dp']:.3f} IN WC"
-    if results['worst_connector_dp'] > DRYER_CONNECTOR_MAX_DP:
-        outline += " ⚠️ *Exceeds 0.25 IN WC guideline*"
-    
-    outline += f"\n- Manifold Loss: {results['manifold_dp']:.3f} IN WC"
-    outline += f"\n- **Total System Loss: {results['total_system_dp']:.3f} IN WC**"
-    
-    outline += """
-
----
-
-## Fan Selection
-"""
-    
-    if results['selected_fan']:
-        fan = results['selected_fan']
-        outline += f"""
-### Recommended: {fan['model']}
-
-**Performance:**
-- Available CFM at Operating Point: {fan['available_cfm']:.0f} CFM
-- Design Margin: {fan['margin']:.1f}%
-- Maximum Capacity: {fan['max_cfm']:.0f} CFM @ {fan['max_sp']:.2f} IN WC
-
-**Status:** ✅ Suitable for application
-"""
-        
-        if len(results['suitable_fans']) > 1:
-            outline += "\n**Alternative Options:**\n"
-            for alt_fan in results['suitable_fans'][1:3]:
-                outline += f"- {alt_fan['model']}: {alt_fan['available_cfm']:.0f} CFM @ operating point ({alt_fan['margin']:.1f}% margin)\n"
-    else:
-        outline += "\n❌ No suitable fan found. System requires redesign.\n"
-    
-    outline += """
-
----
-
-## Engineering Notes
-
-**Air Density:** 0.0696 lb/ft³ @ 120°F (dryer exhaust temperature)
-
-**Calculation Method:**
-- Pressure Loss: ΔP = (0.35 × L/D + ΣK) × ρ × (V/1096.2)²
-- K-values per engineering standards
-- Lateral tees (change of direction only): K = 0.75
-- 90° Elbows: K = 0.5
-
-**Code Compliance:**
-- International Mechanical Code (IMC)
-- NFPA 211 Standards
-- Local building codes
-
----
-
-## Prepared By
-
-**LF Systems**
-*A Division of RM Manifold Group Inc.*
-
-🌐 www.lfsystems.net
-
-*Professional Dryer Exhaust Solutions*
-
----
-
-### How to Use This Outline:
-1. Copy all text above
-2. Go to **gamma.app**
-3. Click "Generate" and paste this outline
-4. Gamma will create a professional presentation!
-"""
-    
-    return outline
-
 def generate_pdf_report(project_info, dryers, manifold_info, results):
     """Generate comprehensive PDF report"""
     buffer = io.BytesIO()
@@ -1146,10 +1010,10 @@ def show_results_screen():
     # Generate Reports
     st.subheader("📄 Generate Reports")
     
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
     
     with col1:
-        if st.button("📄 PDF Report", type="primary", use_container_width=True):
+        if st.button("📄 PDF Technical Report", type="primary", use_container_width=True):
             pdf_buffer = generate_pdf_report(
                 st.session_state.project_info,
                 st.session_state.dryers,
@@ -1158,24 +1022,14 @@ def show_results_screen():
             )
             
             st.download_button(
-                label="📥 Download PDF",
+                label="📥 Download PDF Report",
                 data=pdf_buffer,
-                file_name=f"DREX_Report_{st.session_state.project_info.get('name', 'Project').replace(' ', '_')}.pdf",
+                file_name=f"LF_Systems_DREX_Report_{st.session_state.project_info.get('name', 'Project').replace(' ', '_')}.pdf",
                 mime="application/pdf",
                 use_container_width=True
             )
     
     with col2:
-        if st.button("📊 Gamma Presentation", use_container_width=True):
-            gamma_outline = generate_gamma_outline(
-                st.session_state.project_info,
-                st.session_state.dryers,
-                st.session_state.manifold_info,
-                results
-            )
-            st.session_state.gamma_outline = gamma_outline
-            
-    with col3:
         if st.button("📋 CSI Specification", use_container_width=True):
             csi_spec = generate_csi_specification(
                 st.session_state.project_info,
@@ -1187,25 +1041,10 @@ def show_results_screen():
             st.download_button(
                 label="📥 Download CSI Spec",
                 data=csi_spec,
-                file_name=f"DREX_CSI_Spec_{st.session_state.project_info.get('name', 'Project').replace(' ', '_')}.txt",
+                file_name=f"LF_Systems_CSI_Spec_{st.session_state.project_info.get('name', 'Project').replace(' ', '_')}.txt",
                 mime="text/plain",
                 use_container_width=True
             )
-    
-    # Display Gamma outline if generated
-    if 'gamma_outline' in st.session_state:
-        st.markdown("---")
-        st.subheader("🎨 Gamma.app Presentation Outline")
-        st.info("👉 **Instructions:** Copy the outline below, go to [gamma.app](https://gamma.app), click 'Generate', and paste it!")
-        st.text_area(
-            "Copy this outline to Gamma.app:", 
-            st.session_state.gamma_outline, 
-            height=400,
-            key="gamma_text"
-        )
-        col_a, col_b, col_c = st.columns([1, 1, 1])
-        with col_b:
-            st.link_button("🚀 Open Gamma.app", "https://gamma.app", use_container_width=True)
     
     # Navigation
     st.markdown("---")
