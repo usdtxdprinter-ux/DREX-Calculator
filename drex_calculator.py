@@ -652,7 +652,11 @@ END OF SECTION
     return spec
 
 def main():
-    st.set_page_config(page_title="DREX - Dryer Exhaust Calculator | LF Systems", layout="wide", page_icon="🔥")
+    st.set_page_config(
+        page_title="DREX - Dryer Exhaust Calculator | LF Systems", 
+        layout="wide", 
+        page_icon="🧺"  # Laundry/dryer icon
+    )
     initialize_session_state()
     
     # Custom CSS for LF Systems branding
@@ -678,14 +682,24 @@ def main():
     </style>
     """, unsafe_allow_html=True)
     
-    # Header with LF Systems branding
-    col1, col2 = st.columns([1, 5])
-    with col1:
-        st.markdown("# 🔥")
-    with col2:
-        st.title("DREX - Commercial Dryer Exhaust Calculator")
-        st.markdown("**By LF Systems** - *A Division of RM Manifold Group Inc.*")
-        st.markdown("🌐 [www.lfsystems.net](http://www.lfsystems.net)")
+    # Header with LF Systems logo
+    try:
+        col1, col2 = st.columns([1, 3])
+        with col1:
+            st.image("lf_systems_logo.jpg", width=300)
+        with col2:
+            st.title("DREX - Commercial Dryer Exhaust Calculator")
+            st.markdown("*Professional Dryer Exhaust System Design & Analysis*")
+            st.markdown("🌐 [www.lfsystems.net](http://www.lfsystems.net)")
+    except:
+        # Fallback if logo not found
+        col1, col2 = st.columns([1, 5])
+        with col1:
+            st.markdown("# 🧺")
+        with col2:
+            st.title("DREX - Commercial Dryer Exhaust Calculator")
+            st.markdown("**By LF Systems** - *A Division of RM Manifold Group Inc.*")
+            st.markdown("🌐 [www.lfsystems.net](http://www.lfsystems.net)")
     st.markdown("---")
     
     # Sidebar for navigation
