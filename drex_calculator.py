@@ -31,7 +31,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 DRYER_CONNECTOR_MAX_DP = 0.25  # IN WC
 MANIFOLD_MAX_DP = 0.5  # IN WC (target for optimization)
 AIR_DENSITY = 0.0696  # lb/ft^3 at 120°F (dryer exhaust temperature)
-DUCT_FRICTION_FACTOR = 0.35  # Friction factor for duct
+DUCT_FRICTION_FACTOR = 0.3  # Friction factor for duct
 
 # K-values for fittings (dimensionless) - Updated per engineering standards
 K_VALUES = {
@@ -169,10 +169,10 @@ def get_elevation_from_zip(zip_code):
 def calculate_duct_pressure_loss(length, diameter, velocity, k_sum, rho=AIR_DENSITY):
     """
     Calculate pressure loss using the duct design equation
-    dp = ((0.35*L/D) + SUM(k)) * rho * (V/1096.2)^2
+    dp = ((0.3*L/D) + SUM(k)) * rho * (V/1096.2)^2
     
     Where:
-        0.35 = friction factor for duct
+        0.3 = friction factor for duct
         L = length in feet
         D = diameter in inches
         k = sum of fitting loss coefficients (dimensionless)
@@ -506,7 +506,7 @@ def generate_pdf_report(project_info, dryers, manifold_info, results):
     eng_notes = f"""
     <b>Design Standards:</b><br/>
     • Calculations per ASHRAE Fundamentals<br/>
-    • Pressure loss: ΔP = (0.35 × L/D + ΣK) × ρ × (V/1096.2)²<br/>
+    • Pressure loss: ΔP = (0.3 × L/D + ΣK) × ρ × (V/1096.2)²<br/>
     • Air density: 0.0696 lb/ft³ @ 120°F (dryer exhaust temperature)<br/>
     • Code compliance: IMC, NFPA 211, UL 705<br/><br/>
     <b>System Warnings:</b><br/>
