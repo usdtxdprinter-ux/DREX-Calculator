@@ -1,0 +1,36 @@
+# Simple Upload Instructions
+
+## Step 1: Create Repository
+1. Go to: https://github.com/new
+2. Name: `drex-calculator`
+3. Make it PUBLIC
+4. Don't initialize with anything
+5. Click "Create repository"
+
+## Step 2: Upload These Files
+Click "uploading an existing file" and drag these files:
+- drex_calculator.py
+- requirements.txt
+- DEF_Fan_Curves.xlsx
+- gitignore (rename to `.gitignore` after upload)
+- packages.txt
+- README.md
+
+Commit the changes.
+
+## Step 3: Create .streamlit Folder
+1. Click "Add file" → "Create new file"
+2. Name it: `.streamlit/config.toml`
+3. Copy contents from the `config.toml` file in the .streamlit folder
+4. Paste and commit
+
+## Step 4: Deploy
+1. Go to: https://share.streamlit.io
+2. Click "New app"
+3. Repository: usdtxdprinter-ux/drex-calculator
+4. Main file: drex_calculator.py
+5. Deploy!
+
+Your app: https://usdtxdprinter-ux-drex-calculator.streamlit.app
+
+Note: The `gitignore` file needs to be renamed to `.gitignore` (with dot) after uploading to GitHub.
