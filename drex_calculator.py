@@ -918,18 +918,35 @@ def show_manifold_input_screen():
     total_cfm = sum(d['cfm'] for d in st.session_state.dryers)
     st.markdown(f"**Total System CFM:** {total_cfm} CFM")
     
+    # Optimization choice outside form for dynamic update
+    st.subheader("Manifold Configuration")
+    optimize_diameter = st.checkbox("✅ Optimize manifold diameter automatically (target 1.0 IN WC max)", value=True, key="opt_check")
+    
+    if not optimize_diameter:
+        st.info("💡 Manual diameter mode: You will specify the diameter below")
+    else:
+        st.info("🔧 Optimization mode: Diameter will be calculated automatically")
+    
+    st.markdown("---")
+    
     with st.form("manifold_form"):
         col1, col2 = st.columns(2)
         
         with col1:
             manifold_length = st.number_input("Manifold Length (feet)*", min_value=1, max_value=500, value=50, step=5)
-            optimize_diameter = st.checkbox("Optimize manifold diameter (target 1.0 IN WC max)", value=True)
             
+            # Show diameter input based on checkbox state
             if not optimize_diameter:
-                manifold_diameter = st.number_input("Manifold Diameter (inches)*", min_value=6, max_value=36, value=12, step=2)
+                manifold_diameter = st.number_input(
+                    "Manifold Diameter (inches)*", 
+                    min_value=6, 
+                    max_value=36, 
+                    value=12, 
+                    step=1,
+                    help="Standard sizes: 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36 inches"
+                )
             else:
                 manifold_diameter = None
-                st.info("Diameter will be automatically optimized for 1.0 IN WC maximum pressure loss")
         
         with col2:
             st.markdown("**Manifold Fittings**")
