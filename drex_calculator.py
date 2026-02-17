@@ -703,18 +703,16 @@ def generate_csi_specification(project_info, dryers, manifold_info, results):
     doc.add_page_break()
     footer_p = doc.add_paragraph()
     footer_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    footer_run = footer_p.add_run("LF SYSTEMS by RM Manifold Group Inc.
-")
+    footer_run = footer_p.add_run("LF SYSTEMS by RM Manifold Group Inc.\n")
     footer_run.bold = True
     footer_run.font.size = Pt(12)
-    footer_run2 = footer_p.add_run("www.lfsystems.net
-")
+    footer_run2 = footer_p.add_run("www.lfsystems.net\n")
     footer_run2.font.size = Pt(10)
-    footer_run3 = footer_p.add_run(f"Project: {project_info.get('name', 'Commercial Dryer Exhaust')}
-")
+    footer_run3 = footer_p.add_run(f"Project: {project_info.get('name', 'Commercial Dryer Exhaust')}\n")
     footer_run3.font.size = Pt(10)
     footer_run4 = footer_p.add_run(f"Prepared: {datetime.now().strftime('%B %d, %Y')}")
     footer_run4.font.size = Pt(10)
+    
     # Save to buffer
     buffer = io.BytesIO()
     doc.save(buffer)
