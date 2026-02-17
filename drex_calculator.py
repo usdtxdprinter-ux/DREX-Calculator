@@ -94,9 +94,10 @@ def plot_fan_and_system_curves(selected_fan_model, required_cfm, total_system_sp
     system_curve = k * (cfm_range ** 2)
     ax.plot(cfm_range, system_curve, '--', linewidth=2.5, label='System Curve (Manifold Only)', color=BRAND_ACCENT)
     
-    # Mark operating point (using total system pressure)
-    ax.scatter([required_cfm], [total_system_sp], color='#00a86b', s=250, marker='*', 
-               zorder=10, label=f'Operating Point\n({required_cfm:.0f} CFM @ {total_system_sp:.2f}" WC)',
+    # Mark operating point on the system curve (using manifold pressure only)
+    # This shows where the system operates on the manifold resistance curve
+    ax.scatter([required_cfm], [manifold_sp], color='#00a86b', s=250, marker='*', 
+               zorder=10, label=f'Operating Point\n({required_cfm:.0f} CFM @ {manifold_sp:.2f}" WC Manifold)\nTotal System: {total_system_sp:.2f}" WC',
                edgecolors='white', linewidths=2)
     
     # Formatting
