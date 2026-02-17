@@ -29,16 +29,16 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 # Constants
 DRYER_CONNECTOR_MAX_DP = 0.25  # IN WC
-MANIFOLD_MAX_DP = 1.0  # IN WC
+MANIFOLD_MAX_DP = 0.5  # IN WC (target for optimization)
 AIR_DENSITY = 0.0696  # lb/ft^3 at 120°F (dryer exhaust temperature)
 DUCT_FRICTION_FACTOR = 0.35  # Friction factor for duct
 
 # K-values for fittings (dimensionless) - Updated per engineering standards
 K_VALUES = {
-    "90° Elbow": 0.5,
-    "45° Elbow": 0.25,
+    "90° Elbow": 0.25,
+    "45° Elbow": 0.2,
     "30° Elbow": 0.15,
-    "Lateral Tee": 0.75,
+    "Lateral Tee": 0.5,
     "Entry (flush)": 0.5,
     "Exit": 1.0
 }
@@ -511,7 +511,7 @@ def generate_pdf_report(project_info, dryers, manifold_info, results):
     • Code compliance: IMC, NFPA 211, UL 705<br/><br/>
     <b>System Warnings:</b><br/>
     {"• ⚠ Connector pressure loss exceeds 0.25\" WC recommendation<br/>" if results['worst_connector_dp'] > DRYER_CONNECTOR_MAX_DP else ""}
-    {"• ⚠ Manifold pressure loss exceeds 1.0\" WC maximum<br/>" if results['manifold_dp'] > MANIFOLD_MAX_DP else ""}
+    {"• ⚠ Manifold pressure loss exceeds 0.5\" WC maximum<br/>" if results['manifold_dp'] > MANIFOLD_MAX_DP else ""}
     {"• ✓ All pressure losses within acceptable limits<br/>" if results['manifold_dp'] <= MANIFOLD_MAX_DP and results['worst_connector_dp'] <= DRYER_CONNECTOR_MAX_DP else ""}
     """
     story.append(Paragraph(eng_notes, body_style))
@@ -543,7 +543,7 @@ def generate_pdf_report(project_info, dryers, manifold_info, results):
     <b>Phone:</b> (Contact your local representative)<br/>
     <b>Email:</b> info@lfsystems.net<br/>
     <br/>
-    <i>Professional Dryer Exhaust Solutions Since 2008</i>
+    <i>Professional Dryer Exhaust Solutions Since 2013</i>
     """
     story.append(Paragraph(contact, body_style))
     # Footer with branding
@@ -866,7 +866,7 @@ def show_welcome_screen():
     
     #### Design Criteria:
     - Maximum dryer connector loss: 0.25 IN WC (warning issued if exceeded)
-    - Maximum manifold loss: 1.0 IN WC
+    - Maximum manifold loss: 0.5 IN WC (optimization target)
     - Lateral tees only (no 90° tees permitted)
     
     Click **Next** to begin entering your project information.
@@ -1052,7 +1052,7 @@ def show_manifold_input_screen():
     
     # Optimization choice outside form for dynamic update
     st.subheader("Manifold Configuration")
-    optimize_diameter = st.checkbox("✅ Optimize manifold diameter automatically (target 1.0 IN WC max)", value=True, key="opt_check")
+    optimize_diameter = st.checkbox("✅ Optimize manifold diameter automatically (target 0.5 IN WC max)", value=True, key="opt_check")
     
     if not optimize_diameter:
         st.info("💡 Manual diameter mode: You will specify the diameter below")
