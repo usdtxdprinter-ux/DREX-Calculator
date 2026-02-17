@@ -22,19 +22,17 @@ import base64
 # Constants
 DRYER_CONNECTOR_MAX_DP = 0.25  # IN WC
 MANIFOLD_MAX_DP = 1.0  # IN WC
-AIR_DENSITY = 0.075  # lb/ft^3 at standard conditions
+AIR_DENSITY = 0.0696  # lb/ft^3 at 120°F (dryer exhaust temperature)
+DUCT_FRICTION_FACTOR = 0.35  # Friction factor for duct
 
-# K-values for fittings (dimensionless)
+# K-values for fittings (dimensionless) - Updated per engineering standards
 K_VALUES = {
-    "90° Elbow (smooth)": 0.75,
-    "90° Elbow (standard)": 1.3,
-    "45° Elbow": 0.35,
-    "Lateral Tee (branch)": 1.0,
-    "Lateral Tee (straight through)": 0.4,
+    "90° Elbow": 0.5,
+    "45° Elbow": 0.25,
+    "30° Elbow": 0.15,
+    "Lateral Tee": 0.75,
     "Entry (flush)": 0.5,
-    "Entry (bell mouth)": 0.05,
-    "Exit": 1.0,
-    "Damper (fully open)": 0.2
+    "Exit": 1.0
 }
 
 # DEF Fan Curve Data
@@ -111,14 +109,22 @@ def get_elevation_from_zip(zip_code):
 def calculate_duct_pressure_loss(length, diameter, velocity, k_sum, rho=AIR_DENSITY):
     """
     Calculate pressure loss using the duct design equation
-    dp = (0.3*(L/D) + SUM(k)) * rho * (V/1096.2)^2
+    dp = ((0.35*L/D) + SUM(k)) * rho * (V/1096.2)^2
+    
+    Where:
+        0.35 = friction factor for duct
+        L = length in feet
+        D = diameter in inches
+        k = sum of fitting loss coefficients (dimensionless)
+        rho = air density at 120°F (0.0696 lb/ft^3)
+        V = velocity in feet per minute
     
     Args:
         length: duct length in feet
         diameter: duct diameter in inches
         velocity: velocity in feet per minute
         k_sum: sum of all k-values (dimensionless)
-        rho: air density in lb/ft^3
+        rho: air density in lb/ft^3 (default: 0.0696 at 120°F)
     
     Returns:
         pressure loss in IN WC
@@ -126,8 +132,8 @@ def calculate_duct_pressure_loss(length, diameter, velocity, k_sum, rho=AIR_DENS
     if diameter <= 0:
         return 0
     
-    D_ft = diameter / 12  # Convert inches to feet
-    friction_term = 0.3 * (length / D_ft)
+    # Note: diameter is in inches, so L/D gives friction in feet/inch
+    friction_term = DUCT_FRICTION_FACTOR * (length / diameter)
     total_term = friction_term + k_sum
     velocity_term = (velocity / 1096.2) ** 2
     
@@ -615,9 +621,9 @@ def show_dryer_input_screen():
             
             with col3:
                 st.markdown("**Connector Fittings**")
-                num_90_elbows_smooth = st.number_input("90° Elbows (smooth)", min_value=0, max_value=10, value=2, step=1)
-                num_90_elbows_std = st.number_input("90° Elbows (standard)", min_value=0, max_value=10, value=0, step=1)
+                num_90_elbows = st.number_input("90° Elbows", min_value=0, max_value=10, value=2, step=1)
                 num_45_elbows = st.number_input("45° Elbows", min_value=0, max_value=10, value=0, step=1)
+                num_30_elbows = st.number_input("30° Elbows", min_value=0, max_value=10, value=0, step=1)
                 num_lateral_tees = st.number_input("Lateral Tees", min_value=0, max_value=5, value=1, step=1)
             
             col_a, col_b, col_c = st.columns(3)
@@ -630,10 +636,10 @@ def show_dryer_input_screen():
             if submitted:
                 # Calculate total K-value
                 k_total = (
-                    num_90_elbows_smooth * K_VALUES["90° Elbow (smooth)"] +
-                    num_90_elbows_std * K_VALUES["90° Elbow (standard)"] +
+                    num_90_elbows * K_VALUES["90° Elbow"] +
                     num_45_elbows * K_VALUES["45° Elbow"] +
-                    num_lateral_tees * K_VALUES["Lateral Tee (branch)"] +
+                    num_30_elbows * K_VALUES["30° Elbow"] +
+                    num_lateral_tees * K_VALUES["Lateral Tee"] +
                     K_VALUES["Entry (flush)"] +
                     K_VALUES["Exit"] +
                     additional_k
@@ -641,12 +647,12 @@ def show_dryer_input_screen():
                 
                 # Create fittings summary
                 fittings = []
-                if num_90_elbows_smooth > 0:
-                    fittings.append(f"{num_90_elbows_smooth}x 90° Elbow (smooth)")
-                if num_90_elbows_std > 0:
-                    fittings.append(f"{num_90_elbows_std}x 90° Elbow (standard)")
+                if num_90_elbows > 0:
+                    fittings.append(f"{num_90_elbows}x 90° Elbow")
                 if num_45_elbows > 0:
                     fittings.append(f"{num_45_elbows}x 45° Elbow")
+                if num_30_elbows > 0:
+                    fittings.append(f"{num_30_elbows}x 30° Elbow")
                 if num_lateral_tees > 0:
                     fittings.append(f"{num_lateral_tees}x Lateral Tee")
                 fittings.append("Entry + Exit")
@@ -718,21 +724,22 @@ def show_manifold_input_screen():
         
         with col2:
             st.markdown("**Manifold Fittings**")
-            num_90_elbows_smooth = st.number_input("90° Elbows (smooth)", min_value=0, max_value=20, value=2, step=1, key="m_90s")
-            num_90_elbows_std = st.number_input("90° Elbows (standard)", min_value=0, max_value=20, value=0, step=1, key="m_90std")
+            st.info("Note: Do NOT count straight-through tees. Only count lateral tees (change of direction).")
+            num_90_elbows = st.number_input("90° Elbows", min_value=0, max_value=20, value=2, step=1, key="m_90")
             num_45_elbows = st.number_input("45° Elbows", min_value=0, max_value=20, value=0, step=1, key="m_45")
-            num_lateral_tees_straight = st.number_input("Lateral Tees (straight through)", min_value=0, max_value=20, value=len(st.session_state.dryers), step=1, key="m_tee")
+            num_30_elbows = st.number_input("30° Elbows", min_value=0, max_value=20, value=0, step=1, key="m_30")
+            num_lateral_tees = st.number_input("Lateral Tees (change of direction only)", min_value=0, max_value=20, value=0, step=1, key="m_tee")
             additional_k_manifold = st.number_input("Additional K-value (lint collector, etc.)", min_value=0.0, max_value=10.0, value=0.0, step=0.1, key="m_addk")
         
         submitted = st.form_submit_button("Calculate System ➡️", type="primary")
         
         if submitted:
-            # Calculate total K-value for manifold
+            # Calculate total K-value for manifold (no straight-through tees)
             k_total_manifold = (
-                num_90_elbows_smooth * K_VALUES["90° Elbow (smooth)"] +
-                num_90_elbows_std * K_VALUES["90° Elbow (standard)"] +
+                num_90_elbows * K_VALUES["90° Elbow"] +
                 num_45_elbows * K_VALUES["45° Elbow"] +
-                num_lateral_tees_straight * K_VALUES["Lateral Tee (straight through)"] +
+                num_30_elbows * K_VALUES["30° Elbow"] +
+                num_lateral_tees * K_VALUES["Lateral Tee"] +
                 K_VALUES["Entry (flush)"] +
                 K_VALUES["Exit"] +
                 additional_k_manifold
@@ -740,14 +747,14 @@ def show_manifold_input_screen():
             
             # Create fittings summary
             fittings = []
-            if num_90_elbows_smooth > 0:
-                fittings.append(f"{num_90_elbows_smooth}x 90° Elbow (smooth)")
-            if num_90_elbows_std > 0:
-                fittings.append(f"{num_90_elbows_std}x 90° Elbow (standard)")
+            if num_90_elbows > 0:
+                fittings.append(f"{num_90_elbows}x 90° Elbow")
             if num_45_elbows > 0:
                 fittings.append(f"{num_45_elbows}x 45° Elbow")
-            if num_lateral_tees_straight > 0:
-                fittings.append(f"{num_lateral_tees_straight}x Lateral Tee (straight)")
+            if num_30_elbows > 0:
+                fittings.append(f"{num_30_elbows}x 30° Elbow")
+            if num_lateral_tees > 0:
+                fittings.append(f"{num_lateral_tees}x Lateral Tee")
             fittings.append("Entry + Exit")
             fittings_summary = ", ".join(fittings)
             
