@@ -451,12 +451,55 @@ def generate_pdf_report(project_info, dryers, manifold_info, results):
         <b>Maximum Capacity:</b> {fan['max_cfm']:.0f} CFM @ {fan['max_sp']:.2f}\" WC
         """
         story.append(Paragraph(fan_info, body_style))
+        
         # Status indicator
         if fan['margin'] >= 10:
             status_text = '<font color="#00a86b">✓ EXCELLENT - Fan properly sized with adequate safety margin</font>'
         else:
             status_text = '<font color="#b11f33">⚠ Contact LF Systems for optimization recommendations</font>'
         story.append(Paragraph(status_text, body_style))
+        story.append(Spacer(1, 0.2*inch))
+        
+        # Add Fan Curve Plot
+        try:
+            # Generate the fan curve plot
+            fig = plot_fan_and_system_curves(
+                fan['model'],
+                results['total_cfm'],
+                results['total_system_dp'],
+                results['manifold_dp']
+            )
+            
+            # Save plot to temporary buffer
+            img_buffer = io.BytesIO()
+            fig.savefig(img_buffer, format='png', dpi=150, bbox_inches='tight')
+            img_buffer.seek(0)
+            plt.close(fig)
+            
+            # Add plot to PDF
+            img = Image(img_buffer, width=5.5*inch, height=3.3*inch)
+            img.hAlign = 'CENTER'
+            story.append(img)
+            story.append(Spacer(1, 0.2*inch))
+            
+            # Add caption
+            caption_style = ParagraphStyle(
+                'Caption',
+                parent=body_style,
+                fontSize=9,
+                textColor=colors.grey,
+                alignment=TA_CENTER,
+                spaceAfter=6
+            )
+            caption = Paragraph(
+                f"<i>Figure 1: Fan Performance Curve for {fan['model']} showing system operating point</i>",
+                caption_style
+            )
+            story.append(caption)
+        except Exception as e:
+            # If plot fails, just skip it
+            pass
+    
     story.append(Spacer(1, 0.3*inch))
     # Engineering Notes
     story.append(Paragraph("Engineering Notes", heading_style))
