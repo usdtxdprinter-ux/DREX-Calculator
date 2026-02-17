@@ -254,274 +254,472 @@ def select_def_fan(required_cfm, required_sp):
     return suitable_fans
 
 def generate_pdf_report(project_info, dryers, manifold_info, results):
-    """Generate comprehensive PDF report"""
+    """Generate professional sales-focused PDF report with LF Systems branding"""
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
+    doc = SimpleDocTemplate(
+        buffer, 
+        pagesize=letter,
+        topMargin=0.75*inch, 
+        bottomMargin=0.75*inch,
+        leftMargin=0.75*inch,
+        rightMargin=0.75*inch
+    )
     story = []
     styles = getSampleStyleSheet()
-    
-    # Custom styles
+    # Custom Styles with LF Systems branding
     title_style = ParagraphStyle(
         'CustomTitle',
         parent=styles['Heading1'],
-        fontSize=16,
-        textColor=colors.HexColor('#003366'),
-        spaceAfter=12,
-        alignment=TA_CENTER
+        fontSize=24,
+        textColor=colors.HexColor('#2a3853'),  # LF Systems primary color
+        spaceAfter=6,
+        alignment=TA_CENTER,
+        fontName='Helvetica-Bold'
     )
-    
+    subtitle_style = ParagraphStyle(
+        'CustomSubtitle',
+        parent=styles['Normal'],
+        fontSize=14,
+        textColor=colors.HexColor('#234699'),  # LF Systems secondary
+        spaceAfter=20,
+        alignment=TA_CENTER,
+        fontName='Helvetica'
+    )
     heading_style = ParagraphStyle(
         'CustomHeading',
         parent=styles['Heading2'],
-        fontSize=12,
-        textColor=colors.HexColor('#003366'),
-        spaceAfter=6,
-        spaceBefore=12
+        fontSize=16,
+        textColor=colors.HexColor('#2a3853'),
+        spaceBefore=16,
+        spaceAfter=10,
+        fontName='Helvetica-Bold',
+        borderPadding=5,
+        leftIndent=0
     )
-    
+    body_style = ParagraphStyle(
+        'CustomBody',
+        parent=styles['Normal'],
+        fontSize=11,
+        textColor=colors.black,
+        spaceAfter=12,
+        alignment=TA_JUSTIFY,
+        fontName='Helvetica'
+    )
+    # LF Systems Logo (if available)
+    try:
+        logo = Image('lf_systems_logo.jpg', width=3*inch, height=0.75*inch)
+        logo.hAlign = 'CENTER'
+        story.append(logo)
+        story.append(Spacer(1, 0.2*inch))
+    except:
+        # Fallback if logo not available
+        logo_text = Paragraph("<b>LF SYSTEMS</b><br/>by RM Manifold Group Inc.", subtitle_style)
+        story.append(logo_text)
+        story.append(Spacer(1, 0.2*inch))
     # Title
-    story.append(Paragraph("COMMERCIAL DRYER EXHAUST SYSTEM", title_style))
-    story.append(Paragraph("SIZING CALCULATION REPORT", title_style))
+    title = Paragraph("Commercial Dryer Exhaust<br/>System Proposal", title_style)
+    story.append(title)
+    subtitle = Paragraph(f"<i>{project_info.get('name', 'Your Project')}</i>", subtitle_style)
+    story.append(subtitle)
+    # Project Info Box
+    project_data = [
+        ['Project Location:', f"{project_info.get('city', 'N/A')}, {project_info.get('state', 'N/A')}"],
+        ['Elevation:', f"{project_info.get('elevation', 'N/A')} ft"],
+        ['Prepared For:', project_info.get('user_name', 'N/A')],
+        ['Date:', datetime.now().strftime('%B %d, %Y')],
+    ]
+    project_table = Table(project_data, colWidths=[2*inch, 4*inch])
+    project_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f0f2f6')),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+    ]))
+    story.append(project_table)
     story.append(Spacer(1, 0.3*inch))
-    
-    # Project Information
-    story.append(Paragraph("PROJECT INFORMATION", heading_style))
-    proj_data = [
-        ["Project Name:", project_info.get('name', 'N/A')],
-        ["Location:", f"{project_info.get('city', 'N/A')}, {project_info.get('state', 'N/A')} {project_info.get('zip', 'N/A')}"],
-        ["Elevation:", f"{project_info.get('elevation', 'N/A')} feet"],
-        ["Engineer:", project_info.get('user_name', 'N/A')],
-        ["Email:", project_info.get('user_email', 'N/A')],
-        ["Date:", datetime.now().strftime("%B %d, %Y")]
-    ]
-    
-    proj_table = Table(proj_data, colWidths=[1.5*inch, 5*inch])
-    proj_table.setStyle(TableStyle([
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-        ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-    ]))
-    story.append(proj_table)
+    # Executive Summary Section
+    story.append(Paragraph("Executive Summary", heading_style))
+    exec_summary = f"""
+    LF Systems is pleased to provide this comprehensive dryer exhaust system solution for your facility. 
+    Our engineered approach ensures optimal performance, code compliance, and long-term reliability.
+    <br/><br/>
+    <b>System Highlights:</b><br/>
+    • {len(dryers)} commercial dryers supported<br/>
+    • {results['total_cfm']:.0f} CFM total exhaust capacity<br/>
+    • {manifold_info['diameter']}" manifold duct system<br/>
+    • DEF Series exhaust fan with L150 intelligent controls<br/>
+    • Fully code-compliant design meeting IMC and NFPA standards
+    """
+    story.append(Paragraph(exec_summary, body_style))
     story.append(Spacer(1, 0.2*inch))
-    
-    # System Summary
-    story.append(Paragraph("SYSTEM SUMMARY", heading_style))
-    summary_data = [
-        ["Total Number of Dryers:", str(len(dryers))],
-        ["Total System CFM:", f"{results.get('total_cfm', 0):.0f} CFM"],
-        ["Worst Case Connector Loss:", f"{results.get('worst_connector_dp', 0):.3f} IN WC"],
-        ["Manifold Diameter:", f"{manifold_info.get('diameter', 'N/A')} inches"],
-        ["Manifold Pressure Loss:", f"{results.get('manifold_dp', 0):.3f} IN WC"],
-        ["Total System Pressure Loss:", f"{results.get('total_system_dp', 0):.3f} IN WC"],
-        ["Recommended Fan:", results.get('selected_fan', {}).get('model', 'N/A')]
+    # Key System Specifications - Highlighted Box
+    story.append(Paragraph("Recommended System Configuration", heading_style))
+    spec_data = [
+        ['SPECIFICATION', 'VALUE'],
+        ['Total System Airflow', f"{results['total_cfm']:.0f} CFM"],
+        ['Manifold Diameter', f"{manifold_info['diameter']}\""],
+        ['Manifold Length', f"{manifold_info['length']} feet"],
+        ['System Static Pressure', f"{results['total_system_dp']:.2f}\" WC"],
+        ['Recommended Fan', results['selected_fan']['model'] if results['selected_fan'] else 'Contact Us'],
+        ['Controller', 'L150 Constant Pressure'],
     ]
-    
-    summary_table = Table(summary_data, colWidths=[2.5*inch, 4*inch])
-    summary_table.setStyle(TableStyle([
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-        ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#E8E8E8')),
+    spec_table = Table(spec_data, colWidths=[3*inch, 2.5*inch])
+    spec_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#234699')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 11),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 1), (-1, -1), 10),
+        ('TOPPADDING', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+        ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#234699')),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8f9fa')]),
     ]))
-    story.append(summary_table)
-    story.append(Spacer(1, 0.2*inch))
-    
-    # Warnings
-    if results.get('worst_connector_dp', 0) > DRYER_CONNECTOR_MAX_DP:
-        warning_text = f"<font color='red'><b>WARNING:</b> Worst case dryer connector pressure loss ({results.get('worst_connector_dp', 0):.3f} IN WC) exceeds recommended maximum of {DRYER_CONNECTOR_MAX_DP} IN WC. Consider reducing connector length or adding a booster fan.</font>"
-        story.append(Paragraph(warning_text, styles['Normal']))
-        story.append(Spacer(1, 0.1*inch))
-    
-    # Individual Dryer Details
+    story.append(spec_table)
+    story.append(Spacer(1, 0.3*inch))
+    # Benefits Section
+    story.append(Paragraph("Why Choose LF Systems?", heading_style))
+    benefits = """
+    <b>Industry-Leading Performance:</b> Our DEF Series fans deliver consistent, reliable exhaust 
+    with intelligent pressure control that adapts to changing load conditions.<br/><br/>
+    <b>Code Compliance Guaranteed:</b> Every system is engineered to meet or exceed IMC, NFPA 211, 
+    and local building code requirements. Our UL-listed components ensure safety and reliability.<br/><br/>
+    <b>Energy Efficiency:</b> Variable-speed EC motors and intelligent controls minimize energy 
+    consumption while maintaining optimal exhaust performance.<br/><br/>
+    <b>Proven Reliability:</b> Backed by RM Manifold Group's decades of HVAC expertise and a 
+    comprehensive 24-month warranty on all equipment.
+    """
+    story.append(Paragraph(benefits, body_style))
     story.append(PageBreak())
-    story.append(Paragraph("INDIVIDUAL DRYER DETAILS", heading_style))
-    
-    for idx, dryer in enumerate(dryers, 1):
-        story.append(Paragraph(f"<b>Dryer #{idx}</b>", styles['Heading3']))
-        
-        dryer_detail_data = [
-            ["CFM:", f"{dryer['cfm']} CFM"],
-            ["Outlet Diameter:", f"{dryer['outlet_diameter']} inches"],
-            ["Connector Length:", f"{dryer['connector_length']} feet"],
-            ["Connector Fittings:", dryer['connector_fittings_summary']],
-            ["Additional K-value:", f"{dryer.get('additional_k', 0):.2f}"],
-            ["Total K-value:", f"{dryer['total_k']:.2f}"],
-            ["Connector Velocity:", f"{dryer['connector_velocity']:.0f} FPM"],
-            ["Connector Pressure Loss:", f"{dryer['connector_dp']:.3f} IN WC"]
-        ]
-        
-        dryer_table = Table(dryer_detail_data, colWidths=[2*inch, 4.5*inch])
-        dryer_table.setStyle(TableStyle([
-            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-            ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 0), (-1, -1), 9),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-        ]))
-        story.append(dryer_table)
-        story.append(Spacer(1, 0.15*inch))
-    
-    # Manifold Details
-    story.append(PageBreak())
-    story.append(Paragraph("MANIFOLD DUCT DETAILS", heading_style))
-    
-    manifold_detail_data = [
-        ["Manifold Length:", f"{manifold_info.get('length', 'N/A')} feet"],
-        ["Manifold Diameter:", f"{manifold_info.get('diameter', 'N/A')} inches"],
-        ["Diameter Selection:", "Optimized" if manifold_info.get('optimize', False) else "User Selected"],
-        ["Manifold Fittings:", manifold_info.get('fittings_summary', 'N/A')],
-        ["Additional K-value:", f"{manifold_info.get('additional_k', 0):.2f}"],
-        ["Total K-value:", f"{results.get('manifold_total_k', 0):.2f}"],
-        ["Manifold Velocity:", f"{results.get('manifold_velocity', 0):.0f} FPM"],
-        ["Manifold Pressure Loss:", f"{results.get('manifold_dp', 0):.3f} IN WC"]
-    ]
-    
-    manifold_table = Table(manifold_detail_data, colWidths=[2*inch, 4.5*inch])
-    manifold_table.setStyle(TableStyle([
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-        ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
+    # Technical Details Section
+    story.append(Paragraph("System Design Details", heading_style))
+    # Dryer Configuration
+    story.append(Paragraph("<b>Dryer Configuration:</b>", body_style))
+    dryer_data = [['#', 'CFM', 'Outlet Ø', 'Connector', 'Pressure Loss']]
+    for idx, dryer in enumerate(dryers[:10], 1):  # Show first 10
+        dryer_data.append([
+            str(idx),
+            f"{dryer['cfm']} CFM",
+            f"{dryer['outlet_diameter']}\"",
+            f"{dryer['connector_length']} ft",
+            f"{dryer['connector_dp']:.3f}\" WC"
+        ])
+    if len(dryers) > 10:
+        dryer_data.append(['...', f'+{len(dryers)-10} more', '', '', ''])
+    dryer_table = Table(dryer_data, colWidths=[0.5*inch, 1.2*inch, 1*inch, 1.2*inch, 1.3*inch])
+    dryer_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2a3853')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 9),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8f9fa')]),
     ]))
-    story.append(manifold_table)
+    story.append(dryer_table)
     story.append(Spacer(1, 0.2*inch))
-    
-    # Fan Selection Details
-    story.append(Paragraph("FAN SELECTION", heading_style))
-    
-    if results.get('selected_fan'):
+    # Manifold System
+    story.append(Paragraph("<b>Manifold System:</b>", body_style))
+    manifold_text = f"""
+    • Length: {manifold_info['length']} feet<br/>
+    • Diameter: {manifold_info['diameter']} inches<br/>
+    • Fittings: {manifold_info.get('fittings_summary', 'As specified')}<br/>
+    • Velocity: {results['manifold_velocity']:.0f} FPM<br/>
+    • Pressure Loss: {results['manifold_dp']:.3f}\" WC (within {MANIFOLD_MAX_DP}\" WC limit)
+    """
+    story.append(Paragraph(manifold_text, body_style))
+    story.append(Spacer(1, 0.2*inch))
+    # Fan Selection
+    if results['selected_fan']:
         fan = results['selected_fan']
-        fan_data = [
-            ["Selected Model:", fan['model']],
-            ["Required CFM:", f"{results.get('total_cfm', 0):.0f} CFM"],
-            ["Required Static Pressure:", f"{results.get('total_system_dp', 0):.3f} IN WC"],
-            ["Fan Capacity at Operating Point:", f"{fan['available_cfm']:.0f} CFM"],
-            ["Design Margin:", f"{fan['margin']:.1f}%"],
-            ["Maximum Fan CFM:", f"{fan['max_cfm']:.0f} CFM"],
-            ["Maximum Fan SP:", f"{fan['max_sp']:.2f} IN WC"]
-        ]
-        
-        fan_table = Table(fan_data, colWidths=[2.5*inch, 4*inch])
-        fan_table.setStyle(TableStyle([
-            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-            ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-            ('BACKGROUND', (0, 0), (0, 0), colors.HexColor('#E8E8E8')),
-        ]))
-        story.append(fan_table)
-    else:
-        story.append(Paragraph("<font color='red'>No suitable fan found for system requirements.</font>", styles['Normal']))
-    
+        story.append(Paragraph("<b>Exhaust Fan Selection:</b>", body_style))
+        fan_info = f"""
+        <b>Model:</b> {fan['model']}<br/>
+        <b>Available CFM at Operating Point:</b> {fan['available_cfm']:.0f} CFM<br/>
+        <b>Design Margin:</b> {fan['margin']:.1f}% (ensures reliable performance)<br/>
+        <b>Maximum Capacity:</b> {fan['max_cfm']:.0f} CFM @ {fan['max_sp']:.2f}\" WC
+        """
+        story.append(Paragraph(fan_info, body_style))
+        # Status indicator
+        if fan['margin'] >= 10:
+            status_text = '<font color="#00a86b">✓ EXCELLENT - Fan properly sized with adequate safety margin</font>'
+        else:
+            status_text = '<font color="#b11f33">⚠ Contact LF Systems for optimization recommendations</font>'
+        story.append(Paragraph(status_text, body_style))
+    story.append(Spacer(1, 0.3*inch))
+    # Engineering Notes
+    story.append(Paragraph("Engineering Notes", heading_style))
+    eng_notes = f"""
+    <b>Design Standards:</b><br/>
+    • Calculations per ASHRAE Fundamentals<br/>
+    • Pressure loss: ΔP = (0.35 × L/D + ΣK) × ρ × (V/1096.2)²<br/>
+    • Air density: 0.0696 lb/ft³ @ 120°F (dryer exhaust temperature)<br/>
+    • Code compliance: IMC, NFPA 211, UL 705<br/><br/>
+    <b>System Warnings:</b><br/>
+    {"• ⚠ Connector pressure loss exceeds 0.25\" WC recommendation<br/>" if results['worst_connector_dp'] > DRYER_CONNECTOR_MAX_DP else ""}
+    {"• ⚠ Manifold pressure loss exceeds 1.0\" WC maximum<br/>" if results['manifold_dp'] > MANIFOLD_MAX_DP else ""}
+    {"• ✓ All pressure losses within acceptable limits<br/>" if results['manifold_dp'] <= MANIFOLD_MAX_DP and results['worst_connector_dp'] <= DRYER_CONNECTOR_MAX_DP else ""}
+    """
+    story.append(Paragraph(eng_notes, body_style))
+    # New page for Next Steps
+    story.append(PageBreak())
+    # Next Steps / Call to Action
+    story.append(Paragraph("Next Steps", heading_style))
+    next_steps = """
+    <b>1. Review & Approval</b><br/>
+    Review this proposal and confirm it meets your project requirements.<br/><br/>
+    <b>2. Detailed Engineering</b><br/>
+    Our engineering team will provide detailed submittal drawings and specifications.<br/><br/>
+    <b>3. Equipment Procurement</b><br/>
+    Once approved, equipment will be manufactured and shipped to your project site.<br/><br/>
+    <b>4. Installation Support</b><br/>
+    LF Systems provides complete installation support and startup assistance.<br/><br/>
+    <b>5. Training & Warranty</b><br/>
+    Comprehensive operator training and 24-month equipment warranty included.
+    """
+    story.append(Paragraph(next_steps, body_style))
+    story.append(Spacer(1, 0.3*inch))
+    # Contact Information
+    story.append(Paragraph("Contact Information", heading_style))
+    contact = """
+    <b>LF Systems</b><br/>
+    A Division of RM Manifold Group Inc.<br/>
+    <br/>
+    <b>Website:</b> www.lfsystems.net<br/>
+    <b>Phone:</b> (Contact your local representative)<br/>
+    <b>Email:</b> info@lfsystems.net<br/>
+    <br/>
+    <i>Professional Dryer Exhaust Solutions Since 2008</i>
+    """
+    story.append(Paragraph(contact, body_style))
+    # Footer with branding
+    story.append(Spacer(1, 0.5*inch))
+    footer_style = ParagraphStyle(
+        'Footer',
+        parent=styles['Normal'],
+        fontSize=8,
+        textColor=colors.grey,
+        alignment=TA_CENTER
+    )
+    footer = Paragraph(
+        "This proposal is valid for 30 days from date of issue. "
+        "Specifications subject to change based on final project requirements.<br/>"
+        "© 2026 LF Systems by RM Manifold Group Inc. All rights reserved.",
+        footer_style
+    )
+    story.append(footer)
     # Build PDF
     doc.build(story)
     buffer.seek(0)
     return buffer
-
 def generate_csi_specification(project_info, dryers, manifold_info, results):
-    """Generate CSI Specification document"""
-    spec = f"""
-SECTION 11 31 00
-COMMERCIAL DRYER EXHAUST SYSTEM
-
-PART 1 - GENERAL
-
-1.1 SUMMARY
-    A. Project: {project_info.get('name', 'N/A')}
-    B. Location: {project_info.get('city', 'N/A')}, {project_info.get('state', 'N/A')}
-    C. This section specifies a complete commercial dryer exhaust system including
-       exhaust fan, ductwork, and all accessories required for proper operation.
-
-1.2 SYSTEM DESCRIPTION
-    A. Total Number of Dryers: {len(dryers)}
-    B. Total System Airflow: {results.get('total_cfm', 0):.0f} CFM
-    C. Total System Static Pressure: {results.get('total_system_dp', 0):.3f} IN WC
-
-1.3 SUBMITTALS
-    A. Product Data: Submit manufacturer's technical data for exhaust fan including
-       performance curves, motor specifications, and installation instructions.
-    B. Shop Drawings: Submit ductwork layout showing all fittings, transitions,
-       and connections.
-    C. Test Reports: Submit field test reports demonstrating system airflow and
-       static pressure performance.
-
-1.4 QUALITY ASSURANCE
-    A. Manufacturer: Provide products from single manufacturer with minimum 10 years
-       experience in dryer exhaust systems.
-    B. Codes and Standards: Install system in accordance with:
-       1. International Mechanical Code (IMC)
-       2. NFPA 211 - Chimneys, Fireplaces, Vents, and Solid Fuel-Burning Appliances
-       3. Local building codes and fire marshal requirements
-
-PART 2 - PRODUCTS
-
-2.1 EXHAUST FAN
-    A. Manufacturer: US Draft Co. or approved equal
-    B. Model: {results.get('selected_fan', {}).get('model', 'N/A')}
-    C. Performance:
-       1. Airflow Capacity: {results.get('total_cfm', 0):.0f} CFM minimum
-       2. Static Pressure: {results.get('total_system_dp', 0):.3f} IN WC minimum
-       3. Fan shall be capable of delivering required CFM at system static pressure
-    D. Construction:
-       1. Heavy gauge steel construction
-       2. Factory assembled and tested
-       3. Suitable for outdoor installation
-    E. Motor:
-       1. Thermally protected
-       2. Permanently lubricated bearings
-       3. Suitable for continuous duty
-
-2.2 DUCTWORK
-    A. Manifold Duct:
-       1. Diameter: {manifold_info.get('diameter', 'N/A')} inches
-       2. Material: Galvanized steel, minimum 24 gauge
-       3. All seams and joints sealed to prevent lint accumulation
-    B. Dryer Connectors:
-       1. Individual connector ducts from each dryer to manifold
-       2. Smooth interior finish to minimize lint accumulation
-       3. All ducts sloped minimum 1/4 inch per foot toward dryers
-    C. Fittings:
-       1. All elbows and transitions formed from duct material
-       2. Only lateral tees permitted - NO 90-degree tees
-       3. Minimum radius for all elbows: 1.5 times duct diameter
-
-2.3 ACCESSORIES
-    A. Lint Collectors: As specified by Owner
-    B. Backdraft Dampers: Where required by code
-    C. Transition Fittings: As required for connections
-
-PART 3 - EXECUTION
-
-3.1 INSTALLATION
-    A. Install exhaust fan in location shown on drawings
-    B. Install ductwork with all joints sealed and properly supported
-    C. Maintain clearances to combustibles per code requirements
-    D. Slope all horizontal ductwork toward dryers for condensate drainage
-    E. Provide access doors for cleaning at required intervals
-
-3.2 FIELD QUALITY CONTROL
-    A. System Testing:
-       1. Measure and record actual system airflow
-       2. Measure and record static pressure at fan inlet
-       3. Verify proper operation of all dampers and controls
-    B. System Balancing:
-       1. Adjust system to deliver specified airflow
-       2. Balance airflow from individual dryers as required
-
-3.3 STARTUP SERVICE
-    A. Factory-authorized technician to supervise initial startup
-    B. Verify proper rotation and operation
-    C. Instruct Owner's personnel in system operation and maintenance
-
-3.4 DEMONSTRATION AND TRAINING
-    A. Demonstrate system operation to Owner's personnel
-    B. Provide operation and maintenance manuals
-
-END OF SECTION
-"""
-    return spec
-
+    """Generate CSI specification as Word document"""
+    doc = Document()
+    # Set up document properties
+    sections = doc.sections
+    for section in sections:
+        section.page_height = Inches(11)
+        section.page_width = Inches(8.5)
+        section.top_margin = Inches(1)
+        section.bottom_margin = Inches(1)
+        section.left_margin = Inches(1)
+        section.right_margin = Inches(1)
+    # Title
+    title = doc.add_paragraph()
+    title_run = title.add_run("SECTION: 23 35 01")
+    title_run.bold = True
+    title_run.font.size = Pt(14)
+    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    subtitle = doc.add_paragraph()
+    subtitle_run = subtitle.add_run("COMMERCIAL DRYER EXHAUST SYSTEM")
+    subtitle_run.bold = True
+    subtitle_run.font.size = Pt(14)
+    subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    doc.add_paragraph()  # Spacing
+    # PART 1: GENERAL
+    heading1 = doc.add_heading("PART 1: GENERAL", level=1)
+    # 1.01 SUMMARY
+    doc.add_heading("1.01 SUMMARY", level=2)
+    p = doc.add_paragraph()
+    p.add_run("A. This system shall provide the required exhaust capacity for commercial clothes dryer applications. The following are components of the system:")
+    dryers_list = doc.add_paragraph(style='List Number')
+    dryers_list.add_run(f"LF Systems, Commercial Dryer Exhaust Fan Model DEF{results.get('selected_fan', {}).get('model', 'XX').replace('DEF', '')}, ETL-listed to UL STD 705.")
+    controls_list = doc.add_paragraph(style='List Number')
+    controls_list.add_run("LF Systems Model L150 Constant Pressure Controller")
+    elec_list = doc.add_paragraph(style='List Number')
+    elec_list.add_run("Electrical connections, by installing contractor.")
+    # 1.02 RELATED REQUIREMENTS  
+    doc.add_heading("1.02 RELATED REQUIREMENTS", level=2)
+    p = doc.add_paragraph()
+    p.add_run("A. Section 01 41 00, REGULATORY REQUIREMENTS")
+    # 1.03 CODES AND STANDARDS
+    doc.add_heading("1.03 CODES AND STANDARDS", level=2)
+    p = doc.add_paragraph()
+    p.add_run("A. The following published specification standards apply to work in this section:")
+    for code in ["UL -- Underwriters Laboratories", "ANSI Z223.1", "NFPA 211", "International Mechanical Code", "National Electrical Code"]:
+        code_p = doc.add_paragraph(style='List Number')
+        code_p.add_run(code)
+    # 1.04 SUBMITTALS
+    doc.add_heading("1.04 SUBMITTALS", level=2)
+    p = doc.add_paragraph()
+    p.add_run("A. Submittal documents shall be provided by the local manufacturer's representative.")
+    p = doc.add_paragraph()
+    p.add_run("B. The following shall be submitted to the Owner's representative:")
+    submit_items = [
+        "All relevant data sheets for the dryer exhaust fan, controller and related controls.",
+        "ASHRAE duct design calculations.",
+        "Wiring diagrams and installation manuals shall be submitted to the installing contractor prior to installation.",
+        "Certification of listing for the actual application by an OSHA approved NRTL."
+    ]
+    for item in submit_items:
+        item_p = doc.add_paragraph(style='List Number')
+        item_p.add_run(item)
+    # 1.05 QUALITY ASSURANCE
+    doc.add_heading("1.05 QUALITY ASSURANCE", level=2)
+    p = doc.add_paragraph()
+    p.add_run(f"A. All listed dryer exhaust fans shall be assembled and marked at the facility indicated by the listing control number.")
+    p = doc.add_paragraph()
+    p.add_run("B. Exhaust system must be able to sense pressure in the venting system and maintain constant pressure.")
+    p = doc.add_paragraph()
+    p.add_run(f"C. System capacity scheduled shall be minimum {results.get('total_cfm', 0):.0f} CFM at {results.get('total_system_dp', 0):.2f} inches water column static pressure.")
+    # 1.06 WARRANTY
+    doc.add_heading("1.06 MANUFACTURER WARRANTY", level=2)
+    p = doc.add_paragraph()
+    p.add_run("A. All equipment is to be guaranteed against defects in materials and/or workmanship for a period of 24 months from the date of delivery to the construction site.")
+    # PART 2: PRODUCTS
+    doc.add_page_break()
+    heading2 = doc.add_heading("PART 2: PRODUCTS", level=1)
+    # 2.01 MANUFACTURER
+    doc.add_heading("2.01 MANUFACTURER, DRYER EXHAUST SYSTEM", level=2)
+    p = doc.add_paragraph()
+    p.add_run("A. Furnish LF Systems Commercial Dryer Exhaust System consisting of the following components:")
+    fan_model = results.get('selected_fan', {}).get('model', 'DEFXX')
+    components = [
+        f"Model {fan_model} Inline dryer exhaust fan with design volume of {results.get('total_cfm', 0):.0f} CFM and design pressure of {results.get('total_system_dp', 0):.2f} inches water column as scheduled.",
+        "Model L150 constant pressure controller with integrated display and alarm outputs.",
+        "Current sensing relay (if required for application)."
+    ]
+    for comp in components:
+        comp_p = doc.add_paragraph(style='List Number')
+        comp_p.add_run(comp)
+    # 2.02 EXHAUST FAN DESCRIPTION
+    doc.add_heading("2.02 DESCRIPTION, INLINE DRYER EXHAUST FAN", level=2)
+    fan_desc = [
+        "The entire dryer exhaust fan shall be constructed of G90 galvanized steel with minimum .030 thickness. The fan shall be listed to UL STD 705 and shall bear the listed mark from an OSHA approved NRTL.",
+        "The fan impeller shall be statically and dynamically balanced with permanently attached balancing weights of the same material as the impeller.",
+        "The dryer exhaust fan shall be listed for 480°F exhaust gas temperatures and shall discharge gases as scheduled on drawings. The fan shall include integrated access panel.",
+        "The fan motor shall be electronically commutated (EC), totally enclosed and outdoor rated with minimum efficiency of 75%. The motor shall provide variable speed control for pressure management."
+    ]
+    for idx, desc in enumerate(fan_desc, 1):
+        p = doc.add_paragraph()
+        p.add_run(f"{chr(64+idx)}. {desc}")
+    # 2.03 CONTROLLER DESCRIPTION
+    doc.add_heading("2.03 DESCRIPTION, L150 CONSTANT PRESSURE CONTROLLER", level=2)
+    controller_desc = [
+        "The L150 constant pressure controller shall monitor and control pressure in the dryer exhaust duct to maintain programmed setpoint pressure.",
+        "The controller's pressure range shall be -1.00\" w.c. to +1.00\" w.c. with resolution of 0.01\" w.c.",
+        "The controller shall provide visual LCD display, audible alarm, and dry contact alarm outputs for remote monitoring.",
+        f"The controller shall maintain setpoint within +/-0.01\" w.c. Setpoint for this application: {results.get('manifold_dp', 0):.2f}\" w.c.",
+        "The L150 shall include sensor verification, sleep mode, and adjustable PID control parameters."
+    ]
+    for idx, desc in enumerate(controller_desc, 1):
+        p = doc.add_paragraph()
+        p.add_run(f"{chr(64+idx)}. {desc}")
+    # 2.04 PERFORMANCE
+    doc.add_heading("2.04 PERFORMANCE REQUIREMENTS", level=2)
+    perf = [
+        "The dryer exhaust fan system shall reach setpoint within 15 seconds of initial demand.",
+        f"Fan shall deliver minimum {results.get('total_cfm', 0):.0f} CFM at {results.get('total_system_dp', 0):.2f}\" w.c. system static pressure.",
+        "The system shall include intelligent feedback signal to determine and control motor RPM.",
+        "System shall operate quietly with vibration isolation as required."
+    ]
+    for idx, desc in enumerate(perf, 1):
+        p = doc.add_paragraph()
+        p.add_run(f"{chr(64+idx)}. {desc}")
+    # 2.05 SEQUENCE OF OPERATION
+    doc.add_heading("2.05 SEQUENCE OF OPERATION", level=2)
+    seq = [
+        "Upon demand signal, the L150 controller activates sensor verification. Once verified, the system controls fan speed to achieve setpoint pressure.",
+        "As individual dryers call for heat, the L150 adjusts fan speed to maintain constant setpoint pressure in the exhaust manifold.",
+        "When all dryers have satisfied, the controller engages sleep mode after programmable delay period.",
+        "System includes integrated alarm functions for low pressure, high pressure, and sensor fault conditions."
+    ]
+    for idx, desc in enumerate(seq, 1):
+        p = doc.add_paragraph()
+        p.add_run(f"{chr(64+idx)}. {desc}")
+    # 2.06 ELECTRICAL
+    doc.add_heading("2.06 ELECTRICAL REQUIREMENTS", level=2)
+    p = doc.add_paragraph()
+    p.add_run("A. Power supply shall be:")
+    elec = [
+        "L150 pressure controller: 120VAC, single phase, 60Hz",
+        "EC motor fan: 120VAC or 240VAC single phase, 60Hz (as scheduled)",
+        "All wiring in accordance with National Electrical Code"
+    ]
+    for item in elec:
+        elec_p = doc.add_paragraph(style='List Number')
+        elec_p.add_run(item)
+    # PART 3: EXECUTION
+    doc.add_page_break()
+    heading3 = doc.add_heading("PART 3: EXECUTION", level=1)
+    # 3.01 INSTALLATION
+    doc.add_heading("3.01 INSTALLATION", level=2)
+    install = [
+        "Complete structural, mechanical, and electrical connections in accordance with manufacturer's printed instructions.",
+        f"Install {len(dryers)} dryer connectors to manifold duct of {manifold_info.get('diameter', 'XX')}\" diameter as shown on drawings.",
+        f"Install manifold duct system of {manifold_info.get('length', 'XX')} feet total length with fittings as scheduled.",
+        f"Mount {fan_model} exhaust fan in location shown on drawings with proper vibration isolation and support.",
+        "Install L150 controller in accessible location for programming and service. Mount pressure sensor in manifold as detailed.",
+        "Low voltage control wiring shall be minimum 18 AWG shielded wire. Maintain separation from line voltage wiring.",
+        "Provide electrical disconnects and overcurrent protection as required by NEC."
+    ]
+    for idx, desc in enumerate(install, 1):
+        p = doc.add_paragraph()
+        p.add_run(f"{chr(64+idx)}. {desc}")
+    # 3.02 STARTUP
+    doc.add_heading("3.02 STARTUP AND COMMISSIONING", level=2)
+    startup = [
+        "System startup shall be performed by qualified LF Systems technician or authorized representative.",
+        "Verify all electrical connections, duct connections, and sensor locations prior to energizing system.",
+        f"Program L150 controller with setpoint pressure of {results.get('manifold_dp', 0):.2f}\" w.c. and verify sensor calibration.",
+        "Test system operation with all connected dryers and verify pressure control performance.",
+        "Provide training to owner's maintenance personnel on system operation, troubleshooting, and routine maintenance."
+    ]
+    for idx, desc in enumerate(startup, 1):
+        p = doc.add_paragraph()
+        p.add_run(f"{chr(64+idx)}. {desc}")
+    # Footer
+    doc.add_page_break()
+    footer_p = doc.add_paragraph()
+    footer_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    footer_run = footer_p.add_run("LF SYSTEMS by RM Manifold Group Inc.
+")
+    footer_run.bold = True
+    footer_run.font.size = Pt(12)
+    footer_run2 = footer_p.add_run("www.lfsystems.net
+")
+    footer_run2.font.size = Pt(10)
+    footer_run3 = footer_p.add_run(f"Project: {project_info.get('name', 'Commercial Dryer Exhaust')}
+")
+    footer_run3.font.size = Pt(10)
+    footer_run4 = footer_p.add_run(f"Prepared: {datetime.now().strftime('%B %d, %Y')}")
+    footer_run4.font.size = Pt(10)
+    # Save to buffer
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    return buffer.getvalue()
 def main():
     st.set_page_config(
         page_title="DREX - Dryer Exhaust Calculator | LF Systems", 
@@ -1047,8 +1245,8 @@ def show_results_screen():
             st.download_button(
                 label="📥 Download CSI Spec",
                 data=csi_spec,
-                file_name=f"LF_Systems_CSI_Spec_{st.session_state.project_info.get('name', 'Project').replace(' ', '_')}.txt",
-                mime="text/plain",
+                file_name=f"LF_Systems_CSI_Spec_{st.session_state.project_info.get('name', 'Project').replace(' ', '_')}.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 use_container_width=True
             )
     
