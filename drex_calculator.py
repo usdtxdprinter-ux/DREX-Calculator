@@ -1,7 +1,7 @@
 """
 DREX - Dryer Exhaust Calculator
 Commercial Dryer Exhaust System Sizing Program
-Developed for US Draft Co.
+Developed for LF Systems by RM Manifold
 """
 
 import streamlit as st
@@ -18,6 +18,8 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 import base64
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 
 # Constants
 DRYER_CONNECTOR_MAX_DP = 0.25  # IN WC
@@ -62,6 +64,49 @@ DEF_FAN_CURVES = {
         "SP": [0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
     }
 }
+
+# LF Systems Branding Colors (from RM Manifold Brand Guide)
+BRAND_PRIMARY = "#2a3853"  # Pantone 533C
+BRAND_SECONDARY = "#234699"  # Pantone 7686C  
+BRAND_ACCENT = "#b11f33"  # Pantone 187C
+BRAND_GRAY = "#97999b"  # Cool Gray 7C
+
+def plot_fan_and_system_curves(selected_fan_model, required_cfm, required_sp):
+    """Generate fan curve and system curve plot"""
+    fig, ax = plt.subplots(figsize=(10, 6))
+    
+    # Plot fan curve
+    fan_data = DEF_FAN_CURVES[selected_fan_model]
+    ax.plot(fan_data['CFM'], fan_data['SP'], 'b-', linewidth=2.5, label=f'{selected_fan_model} Fan Curve', color=BRAND_SECONDARY)
+    ax.scatter(fan_data['CFM'], fan_data['SP'], color=BRAND_SECONDARY, s=60, zorder=5, edgecolors='white', linewidths=1.5)
+    
+    # Plot system curve (parabolic: SP = k * CFM^2)
+    k = required_sp / (required_cfm ** 2) if required_cfm > 0 else 0
+    cfm_range = np.linspace(0, max(fan_data['CFM']) * 1.1, 100)
+    system_curve = k * (cfm_range ** 2)
+    ax.plot(cfm_range, system_curve, '--', linewidth=2.5, label='System Curve', color=BRAND_ACCENT)
+    
+    # Mark operating point
+    ax.scatter([required_cfm], [required_sp], color='#00a86b', s=250, marker='*', 
+               zorder=10, label=f'Operating Point\n({required_cfm:.0f} CFM @ {required_sp:.2f}" WC)',
+               edgecolors='white', linewidths=2)
+    
+    # Formatting
+    ax.set_xlabel('Airflow (CFM)', fontsize=13, fontweight='bold')
+    ax.set_ylabel('Static Pressure (IN WC)', fontsize=13, fontweight='bold')
+    ax.set_title(f'Fan Performance & System Curve - {selected_fan_model}', fontsize=15, fontweight='bold', pad=20)
+    ax.grid(True, alpha=0.3, linestyle=':', linewidth=1)
+    ax.legend(loc='upper right', fontsize=11, framealpha=0.95)
+    ax.set_xlim(0, max(fan_data['CFM']) * 1.15)
+    ax.set_ylim(0, max(fan_data['SP']) * 1.15)
+    
+    # Add LF Systems watermark
+    ax.text(0.98, 0.02, 'LF Systems by RM Manifold | www.lfsystems.net', 
+            transform=ax.transAxes, fontsize=9, color='gray', alpha=0.7,
+            ha='right', va='bottom', style='italic')
+    
+    plt.tight_layout()
+    return fig
 
 def initialize_session_state():
     """Initialize session state variables"""
@@ -192,6 +237,142 @@ def select_def_fan(required_cfm, required_sp):
     suitable_fans.sort(key=lambda x: abs(x['margin'] - 17.5))
     
     return suitable_fans
+
+def generate_gamma_outline(project_info, dryers, manifold_info, results):
+    """Generate professional report outline for Gamma.app"""
+    
+    # Build content for Gamma
+    outline = f"""# DREX Dryer Exhaust System Report
+## {project_info.get('name', 'Commercial Dryer Exhaust System')}
+
+*Prepared by LF Systems - A Division of RM Manifold Group Inc.*
+
+---
+
+## Executive Summary
+
+**Project Details:**
+- Location: {project_info.get('city', 'N/A')}, {project_info.get('state', 'N/A')}
+- Elevation: {project_info.get('elevation', 'N/A')} feet
+- Prepared by: {project_info.get('user_name', 'N/A')}
+- Date: {datetime.now().strftime('%B %d, %Y')}
+
+**System Overview:**
+- Total System CFM: **{results['total_cfm']:.0f} CFM**
+- Manifold Diameter: **{manifold_info['diameter']}"**
+- Total System Pressure Loss: **{results['total_system_dp']:.3f} IN WC**
+- Recommended Fan: **{results['selected_fan']['model'] if results['selected_fan'] else 'TBD'}**
+
+---
+
+## Dryer Configuration
+
+**{len(dryers)} Dryers Connected:**
+"""
+    
+    for idx, dryer in enumerate(dryers, 1):
+        outline += f"\n{idx}. **Dryer #{idx}**: {dryer['cfm']} CFM @ {dryer['outlet_diameter']}\" outlet"
+        outline += f"\n   - Connector: {dryer['connector_length']}' long"
+        outline += f"\n   - Pressure Loss: {dryer['connector_dp']:.3f} IN WC"
+    
+    outline += f"""
+
+---
+
+## Manifold System
+
+**Specifications:**
+- Total Length: {manifold_info['length']} feet
+- Diameter: {manifold_info['diameter']}"
+- Fittings: {manifold_info['fittings_summary']}
+- Velocity: {results['manifold_velocity']:.0f} FPM
+- Pressure Loss: {results['manifold_dp']:.3f} IN WC
+
+**Design Criteria:**
+- Maximum Manifold Loss: 1.0 IN WC
+- Status: {"✅ PASS" if results['manifold_dp'] <= MANIFOLD_MAX_DP else "❌ EXCEEDS LIMIT"}
+
+---
+
+## Pressure Loss Analysis
+
+**System Breakdown:**
+"""
+    
+    outline += f"\n- Worst Connector Loss: {results['worst_connector_dp']:.3f} IN WC"
+    if results['worst_connector_dp'] > DRYER_CONNECTOR_MAX_DP:
+        outline += " ⚠️ *Exceeds 0.25 IN WC guideline*"
+    
+    outline += f"\n- Manifold Loss: {results['manifold_dp']:.3f} IN WC"
+    outline += f"\n- **Total System Loss: {results['total_system_dp']:.3f} IN WC**"
+    
+    outline += """
+
+---
+
+## Fan Selection
+"""
+    
+    if results['selected_fan']:
+        fan = results['selected_fan']
+        outline += f"""
+### Recommended: {fan['model']}
+
+**Performance:**
+- Available CFM at Operating Point: {fan['available_cfm']:.0f} CFM
+- Design Margin: {fan['margin']:.1f}%
+- Maximum Capacity: {fan['max_cfm']:.0f} CFM @ {fan['max_sp']:.2f} IN WC
+
+**Status:** ✅ Suitable for application
+"""
+        
+        if len(results['suitable_fans']) > 1:
+            outline += "\n**Alternative Options:**\n"
+            for alt_fan in results['suitable_fans'][1:3]:
+                outline += f"- {alt_fan['model']}: {alt_fan['available_cfm']:.0f} CFM @ operating point ({alt_fan['margin']:.1f}% margin)\n"
+    else:
+        outline += "\n❌ No suitable fan found. System requires redesign.\n"
+    
+    outline += """
+
+---
+
+## Engineering Notes
+
+**Air Density:** 0.0696 lb/ft³ @ 120°F (dryer exhaust temperature)
+
+**Calculation Method:**
+- Pressure Loss: ΔP = (0.35 × L/D + ΣK) × ρ × (V/1096.2)²
+- K-values per engineering standards
+- Lateral tees (change of direction only): K = 0.75
+- 90° Elbows: K = 0.5
+
+**Code Compliance:**
+- International Mechanical Code (IMC)
+- NFPA 211 Standards
+- Local building codes
+
+---
+
+## Prepared By
+
+**LF Systems**
+*A Division of RM Manifold Group Inc.*
+
+🌐 www.lfsystems.net
+
+*Professional Dryer Exhaust Solutions*
+
+---
+
+### How to Use This Outline:
+1. Copy all text above
+2. Go to **gamma.app**
+3. Click "Generate" and paste this outline
+4. Gamma will create a professional presentation!
+"""
+    
+    return outline
 
 def generate_pdf_report(project_info, dryers, manifold_info, results):
     """Generate comprehensive PDF report"""
@@ -463,12 +644,40 @@ END OF SECTION
     return spec
 
 def main():
-    st.set_page_config(page_title="DREX - Dryer Exhaust Calculator", layout="wide")
+    st.set_page_config(page_title="DREX - Dryer Exhaust Calculator | LF Systems", layout="wide", page_icon="🔥")
     initialize_session_state()
     
-    # Header
-    st.title("🌪️ DREX - Commercial Dryer Exhaust Calculator")
-    st.markdown("*Developed by US Draft Co.*")
+    # Custom CSS for LF Systems branding
+    st.markdown(f"""
+    <style>
+        .stMetric {{
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-left: 4px solid {BRAND_PRIMARY};
+            border-radius: 4px;
+        }}
+        .stButton>button {{
+            background-color: {BRAND_SECONDARY};
+            color: white;
+            font-weight: 500;
+        }}
+        .stButton>button:hover {{
+            background-color: {BRAND_PRIMARY};
+        }}
+        h1 {{
+            color: {BRAND_PRIMARY};
+        }}
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Header with LF Systems branding
+    col1, col2 = st.columns([1, 5])
+    with col1:
+        st.markdown("# 🔥")
+    with col2:
+        st.title("DREX - Commercial Dryer Exhaust Calculator")
+        st.markdown("**By LF Systems** - *A Division of RM Manifold Group Inc.*")
+        st.markdown("🌐 [www.lfsystems.net](http://www.lfsystems.net)")
     st.markdown("---")
     
     # Sidebar for navigation
@@ -862,23 +1071,31 @@ def show_results_screen():
     if results['selected_fan']:
         fan = results['selected_fan']
         
-        col1, col2 = st.columns([2, 1])
+        # Fan information and curve plot side by side
+        col1, col2 = st.columns([1, 1])
         
         with col1:
             st.success(f"**Recommended Fan:** {fan['model']}")
             st.write(f"**Available CFM at Operating Point:** {fan['available_cfm']:.0f} CFM")
             st.write(f"**Design Margin:** {fan['margin']:.1f}%")
             st.write(f"**Maximum Fan Capacity:** {fan['max_cfm']:.0f} CFM @ {fan['max_sp']:.2f} IN WC")
+            
+            # Show alternative fans if available
+            if len(results['suitable_fans']) > 1:
+                with st.expander("View Alternative Fan Options"):
+                    for alt_fan in results['suitable_fans'][1:4]:  # Show up to 3 alternatives
+                        st.write(f"**{alt_fan['model']}** - {alt_fan['available_cfm']:.0f} CFM @ operating point ({alt_fan['margin']:.1f}% margin)")
         
         with col2:
-            # Show fan curve visualization
-            st.info("Fan operating point within acceptable range")
-        
-        # Show alternative fans if available
-        if len(results['suitable_fans']) > 1:
-            with st.expander("View Alternative Fan Options"):
-                for alt_fan in results['suitable_fans'][1:4]:  # Show up to 3 alternatives
-                    st.write(f"**{alt_fan['model']}** - {alt_fan['available_cfm']:.0f} CFM @ operating point ({alt_fan['margin']:.1f}% margin)")
+            # Show fan curve plot
+            st.markdown("**Fan Performance Curve:**")
+            fig = plot_fan_and_system_curves(
+                fan['model'],
+                results['total_cfm'],
+                results['total_system_dp']
+            )
+            st.pyplot(fig)
+            plt.close()
     
     else:
         st.error("❌ No suitable DEF fan found for the system requirements. System pressure loss may be too high or CFM too low.")
@@ -886,12 +1103,12 @@ def show_results_screen():
     st.markdown("---")
     
     # Generate Reports
-    st.subheader("📄 Download Reports")
+    st.subheader("📄 Generate Reports")
     
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     
     with col1:
-        if st.button("Generate PDF Report", type="primary"):
+        if st.button("📄 PDF Report", type="primary", use_container_width=True):
             pdf_buffer = generate_pdf_report(
                 st.session_state.project_info,
                 st.session_state.dryers,
@@ -900,14 +1117,25 @@ def show_results_screen():
             )
             
             st.download_button(
-                label="📥 Download PDF Report",
+                label="📥 Download PDF",
                 data=pdf_buffer,
                 file_name=f"DREX_Report_{st.session_state.project_info.get('name', 'Project').replace(' ', '_')}.pdf",
-                mime="application/pdf"
+                mime="application/pdf",
+                use_container_width=True
             )
     
     with col2:
-        if st.button("Generate CSI Specification"):
+        if st.button("📊 Gamma Presentation", use_container_width=True):
+            gamma_outline = generate_gamma_outline(
+                st.session_state.project_info,
+                st.session_state.dryers,
+                st.session_state.manifold_info,
+                results
+            )
+            st.session_state.gamma_outline = gamma_outline
+            
+    with col3:
+        if st.button("📋 CSI Specification", use_container_width=True):
             csi_spec = generate_csi_specification(
                 st.session_state.project_info,
                 st.session_state.dryers,
@@ -916,11 +1144,27 @@ def show_results_screen():
             )
             
             st.download_button(
-                label="📥 Download CSI Specification",
+                label="📥 Download CSI Spec",
                 data=csi_spec,
-                file_name=f"CSI_Spec_113100_{st.session_state.project_info.get('name', 'Project').replace(' ', '_')}.txt",
-                mime="text/plain"
+                file_name=f"DREX_CSI_Spec_{st.session_state.project_info.get('name', 'Project').replace(' ', '_')}.txt",
+                mime="text/plain",
+                use_container_width=True
             )
+    
+    # Display Gamma outline if generated
+    if 'gamma_outline' in st.session_state:
+        st.markdown("---")
+        st.subheader("🎨 Gamma.app Presentation Outline")
+        st.info("👉 **Instructions:** Copy the outline below, go to [gamma.app](https://gamma.app), click 'Generate', and paste it!")
+        st.text_area(
+            "Copy this outline to Gamma.app:", 
+            st.session_state.gamma_outline, 
+            height=400,
+            key="gamma_text"
+        )
+        col_a, col_b, col_c = st.columns([1, 1, 1])
+        with col_b:
+            st.link_button("🚀 Open Gamma.app", "https://gamma.app", use_container_width=True)
     
     # Navigation
     st.markdown("---")
