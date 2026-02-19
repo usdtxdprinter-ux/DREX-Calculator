@@ -40,7 +40,8 @@ K_VALUES = {
     "30° Elbow": 0.15,
     "Lateral Tee": 0.5,
     "Entry (flush)": 0.5,
-    "Exit": 1.0
+    "Exit": 1.0,
+    "ILC Lint Collector": 1.25
 }
 
 # DEF Fan Curve Data
@@ -122,6 +123,75 @@ def plot_fan_and_system_curves(selected_fan_model, required_cfm, total_system_sp
     
     plt.tight_layout()
     return fig
+
+def get_rep_info_by_state(state_abbr):
+    """Get representative contact info based on state abbreviation"""
+    try:
+        # Load rep distribution file
+        df = pd.read_excel('LFS_reps_dist.xlsx')
+        
+        # Convert state abbreviation to lowercase state code prefix
+        state_code_map = {
+            'AL': 'al', 'AK': 'ak', 'AZ': 'az', 'AR': 'ar', 'CA': 'ca', 'CO': 'co', 'CT': 'ct', 
+            'DE': 'de', 'FL': 'fl', 'GA': 'ga', 'HI': 'hi', 'ID': 'id', 'IL': 'il', 'IN': 'in',
+            'IA': 'ia', 'KS': 'ks', 'KY': 'ky', 'LA': 'la', 'ME': 'me', 'MD': 'md', 'MA': 'ma',
+            'MI': 'mi', 'MN': 'mn', 'MS': 'ms', 'MO': 'mo', 'MT': 'mt', 'NE': 'ne', 'NV': 'nv',
+            'NH': 'nh', 'NJ': 'nj', 'NM': 'nm', 'NY': 'ny', 'NC': 'nc', 'ND': 'nd', 'OH': 'oh',
+            'OK': 'ok', 'OR': 'or', 'PA': 'pa', 'RI': 'ri', 'SC': 'sc', 'SD': 'sd', 'TN': 'tn',
+            'TX': 'tx', 'UT': 'ut', 'VT': 'vt', 'VA': 'va', 'WA': 'wa', 'WV': 'wv', 'WI': 'wi', 'WY': 'wy'
+        }
+        
+        state_code = state_code_map.get(state_abbr.upper())
+        if not state_code:
+            return None
+            
+        # Find first county in that state with rep info
+        state_rows = df[df['id'].str.startswith(state_code, na=False) & df['info'].notna()]
+        
+        if len(state_rows) == 0:
+            return None
+            
+        # Get the first rep info for this state
+        rep_info_raw = state_rows.iloc[0]['info']
+        
+        # Parse the HTML-like rep info
+        lines = rep_info_raw.split('\\n')
+        rep_type = ""
+        company = ""
+        address = ""
+        phone = ""
+        website = ""
+        
+        for i, line in enumerate(lines):
+            line = line.strip()
+            if '<strong>REPRESENTATIVE</strong>' in line or '<strong>DISTRIBUTOR</strong>' in line:
+                rep_type = "REPRESENTATIVE" if "REPRESENTATIVE" in line else "DISTRIBUTOR"
+            elif i == 1 and line:  # Company name is typically second line
+                company = line
+            elif 'href=' in line:  # Website
+                # Extract URL from <a> tag
+                import re
+                match = re.search(r'href="([^"]+)"', line)
+                if match:
+                    website = match.group(1)
+            elif line and not line.startswith('<'):
+                # Check if it's a phone number
+                if any(char.isdigit() for char in line) and '-' in line and len(line) < 20:
+                    phone = line
+                elif line and not phone and not website:  # Address lines
+                    address += line + "\\n"
+        
+        return {
+            'type': rep_type,
+            'company': company.strip(),
+            'address': address.strip(),
+            'phone': phone.strip(),
+            'website': website.strip()
+        }
+        
+    except Exception as e:
+        # Return None if file not found or error
+        return None
 
 def initialize_session_state():
     """Initialize session state variables"""
@@ -501,6 +571,69 @@ def generate_pdf_report(project_info, dryers, manifold_info, results):
             pass
     
     story.append(Spacer(1, 0.3*inch))
+    
+    # ILC Lint Collector Selection
+    ilc_needed = False
+    ilc_models = []
+    
+    # Check if ILC is needed in manifold
+    if manifold_info.get('has_ilc', False):
+        ilc_needed = True
+        manifold_dia = manifold_info['diameter']
+        ilc_model = f"ILC{manifold_dia:02d}"
+        ilc_models.append(('manifold', ilc_model, manifold_dia))
+    
+    # Check if ILC is needed in any dryer connectors
+    for dryer in dryers:
+        if dryer.get('has_ilc', False):
+            ilc_needed = True
+            conn_dia = dryer['outlet_diameter']
+            ilc_model = f"ILC{conn_dia:02d}"
+            ilc_models.append(('connector', ilc_model, conn_dia))
+    
+    if ilc_needed:
+        story.append(Paragraph("<b>LF Systems ILC Inline Lint Collector:</b>", body_style))
+        
+        # Group by model
+        ilc_counts = {}
+        for location, model, dia in ilc_models:
+            if model not in ilc_counts:
+                ilc_counts[model] = {'count': 0, 'diameter': dia, 'locations': []}
+            ilc_counts[model]['count'] += 1
+            ilc_counts[model]['locations'].append(location)
+        
+        ilc_info = ""
+        for ilc_model, info in ilc_counts.items():
+            locations_text = "Manifold" if 'manifold' in info['locations'] else ""
+            if 'connector' in info['locations']:
+                conn_count = info['locations'].count('connector')
+                if locations_text:
+                    locations_text += f" + {conn_count} connector(s)"
+                else:
+                    locations_text = f"{conn_count} connector(s)"
+            
+            ilc_info += f"<b>Model:</b> {ilc_model} ({info['diameter']}\" diameter)<br/>"
+            ilc_info += f"<b>Quantity:</b> {info['count']}<br/>"
+            ilc_info += f"<b>Location:</b> {locations_text}<br/>"
+            ilc_info += f"<b>Specifications:</b> 800 micron filter bag, tool-less access, K-value: 1.25<br/><br/>"
+        
+        story.append(Paragraph(ilc_info, body_style))
+        story.append(Spacer(1, 0.2*inch))
+    
+    # Supply Air Fan (if applicable)
+    if results.get('has_supply_fan', False) and results['selected_fan']:
+        story.append(Paragraph("<b>Supply Air Fan:</b>", body_style))
+        
+        supply_fan_model = results['selected_fan']['model']
+        supply_info = f"""
+        <b>Model:</b> {supply_fan_model} (matches exhaust fan)<br/>
+        <b>Capacity:</b> {results['selected_fan']['max_cfm']:.0f} CFM @ {results['selected_fan']['max_sp']:.2f}\" WC<br/>
+        <b>Controller:</b> L150.LS (integrated exhaust and supply fan control)<br/>
+        <b>Application:</b> Provides make-up air to maintain building pressure balance
+        """
+        story.append(Paragraph(supply_info, body_style))
+        story.append(Spacer(1, 0.2*inch))
+    
     # Engineering Notes
     story.append(Paragraph("Engineering Notes", heading_style))
     eng_notes = f"""
@@ -535,13 +668,31 @@ def generate_pdf_report(project_info, dryers, manifold_info, results):
     story.append(Spacer(1, 0.3*inch))
     # Contact Information
     story.append(Paragraph("Contact Information", heading_style))
+    
+    # Get rep info based on state
+    rep_info = get_rep_info_by_state(project_info.get('state', ''))
+    
     contact = """
     <b>LF Systems</b><br/>
     A Division of RM Manifold Group Inc.<br/>
     <br/>
     <b>Website:</b> www.lfsystems.net<br/>
-    <b>Phone:</b> (Contact your local representative)<br/>
+    <b>Phone:</b> (817) 393-4029<br/>
     <b>Email:</b> info@lfsystems.net<br/>
+    """
+    
+    # Add local representative info if found
+    if rep_info:
+        contact += f"""
+        <br/>
+        <b>Your Local {rep_info['type']}:</b><br/>
+        <b>{rep_info['company']}</b><br/>
+        {rep_info['address'].replace(chr(10), '<br/>')}<br/>
+        <b>Phone:</b> {rep_info['phone']}<br/>
+        {f"<b>Website:</b> {rep_info['website']}<br/>" if rep_info['website'] else ""}
+        """
+    
+    contact += """
     <br/>
     <i>Professional Dryer Exhaust Solutions Since 2013</i>
     """
@@ -648,11 +799,40 @@ def generate_csi_specification(project_info, dryers, manifold_info, results):
     p = doc.add_paragraph()
     p.add_run("A. Furnish LF Systems Commercial Dryer Exhaust System consisting of the following components:")
     fan_model = results.get('selected_fan', {}).get('model', 'DEFXX')
+    has_supply_fan = results.get('has_supply_fan', False)
+    controller_model = "L150.LS" if has_supply_fan else "L150"
+    
     components = [
         f"Model {fan_model} Inline dryer exhaust fan with design volume of {results.get('total_cfm', 0):.0f} CFM and design pressure of {results.get('total_system_dp', 0):.2f} inches water column as scheduled.",
-        "Model L150 constant pressure controller with integrated display and alarm outputs.",
+        f"Model {controller_model} constant pressure controller with integrated display and alarm outputs.",
         "Current sensing relay (if required for application)."
     ]
+    
+    # Add supply fan if needed
+    if has_supply_fan:
+        components.append(f"Model {fan_model} Supply air fan (matches exhaust fan for pressure balancing).")
+    
+    # Add ILC if needed
+    ilc_needed = False
+    ilc_models = []
+    if manifold_info.get('has_ilc', False):
+        ilc_needed = True
+        ilc_models.append(f"ILC{manifold_info['diameter']:02d}")
+    for dryer in dryers:
+        if dryer.get('has_ilc', False):
+            ilc_needed = True
+            ilc_models.append(f"ILC{dryer['outlet_diameter']:02d}")
+    
+    if ilc_needed:
+        # Get unique models and counts
+        from collections import Counter
+        ilc_counts = Counter(ilc_models)
+        for ilc_model, count in ilc_counts.items():
+            if count > 1:
+                components.append(f"Model {ilc_model} Inline Lint Collector, quantity: {count}")
+            else:
+                components.append(f"Model {ilc_model} Inline Lint Collector")
+    
     for comp in components:
         comp_p = doc.add_paragraph(style='List Number')
         comp_p.add_run(comp)
@@ -679,8 +859,43 @@ def generate_csi_specification(project_info, dryers, manifold_info, results):
     for idx, desc in enumerate(controller_desc, 1):
         p = doc.add_paragraph()
         p.add_run(f"{chr(64+idx)}. {desc}")
-    # 2.04 PERFORMANCE
-    doc.add_heading("2.04 PERFORMANCE REQUIREMENTS", level=2)
+    
+    # Track section numbers
+    current_section = 4
+    
+    # 2.04 SUPPLY FAN DESCRIPTION (if applicable)
+    if has_supply_fan:
+        doc.add_heading(f"2.{current_section:02d} DESCRIPTION, SUPPLY AIR FAN", level=2)
+        supply_desc = [
+            f"Supply air fan shall be Model {fan_model}, matching the exhaust fan capacity and specifications.",
+            "Supply fan shall provide make-up air to maintain building pressure balance during dryer operation.",
+            "Fan construction and motor specifications shall match exhaust fan as specified in Section 2.02.",
+            "Supply fan shall be controlled by L150.LS controller for coordinated operation with exhaust fan.",
+            "Supply fan shall operate to maintain neutral or slightly positive building pressure during dryer exhaust operation."
+        ]
+        for idx, desc in enumerate(supply_desc, 1):
+            p = doc.add_paragraph()
+            p.add_run(f"{chr(64+idx)}. {desc}")
+        current_section += 1
+    
+    # ILC DESCRIPTION (if applicable)
+    if ilc_needed:
+        doc.add_heading(f"2.{current_section:02d} DESCRIPTION, ILC INLINE LINT COLLECTOR", level=2)
+        ilc_desc = [
+            "The ILC Inline Lint Collector shall be designed to remove remaining lint in the dryer exhaust system.",
+            "Construction shall be 20 gauge stainless steel housing with polyester multi-filament 800 micron filter bag.",
+            "Unit shall include tool-less access door panel for easy maintenance and filter bag cleaning.",
+            "Filter bag shall be reusable and washable.",
+            f"ILC unit(s) shall be sized to match duct diameter as specified: {', '.join(set(ilc_models))}.",
+            "When used with L150 controller, system shall alert operator when filter bag requires cleaning."
+        ]
+        for idx, desc in enumerate(ilc_desc, 1):
+            p = doc.add_paragraph()
+            p.add_run(f"{chr(64+idx)}. {desc}")
+        current_section += 1
+    
+    # PERFORMANCE REQUIREMENTS
+    doc.add_heading(f"2.{current_section:02d} PERFORMANCE REQUIREMENTS", level=2)
     perf = [
         "The dryer exhaust fan system shall reach setpoint within 15 seconds of initial demand.",
         f"Fan shall deliver minimum {results.get('total_cfm', 0):.0f} CFM at {results.get('total_system_dp', 0):.2f}\" w.c. system static pressure.",
@@ -751,6 +966,29 @@ def generate_csi_specification(project_info, dryers, manifold_info, results):
     footer_run.font.size = Pt(12)
     footer_run2 = footer_p.add_run("www.lfsystems.net\n")
     footer_run2.font.size = Pt(10)
+    
+    # Add local rep info
+    rep_info = get_rep_info_by_state(project_info.get('state', ''))
+    if rep_info:
+        footer_p.add_run("\n")
+        rep_run = footer_p.add_run(f"Your Local {rep_info['type']}:\n")
+        rep_run.bold = True
+        rep_run.font.size = Pt(10)
+        
+        rep_company = footer_p.add_run(f"{rep_info['company']}\n")
+        rep_company.font.size = Pt(9)
+        
+        rep_address = footer_p.add_run(f"{rep_info['address']}\n")
+        rep_address.font.size = Pt(9)
+        
+        rep_phone = footer_p.add_run(f"Phone: {rep_info['phone']}\n")
+        rep_phone.font.size = Pt(9)
+        
+        if rep_info['website']:
+            rep_web = footer_p.add_run(f"{rep_info['website']}\n")
+            rep_web.font.size = Pt(9)
+    
+    footer_p.add_run("\n")
     footer_run3 = footer_p.add_run(f"Project: {project_info.get('name', 'Commercial Dryer Exhaust')}\n")
     footer_run3.font.size = Pt(10)
     footer_run4 = footer_p.add_run(f"Prepared: {datetime.now().strftime('%B %d, %Y')}")
@@ -958,7 +1196,9 @@ def show_dryer_input_screen():
             
             with col2:
                 connector_length = st.number_input("Connector Length (feet)*", min_value=1, max_value=100, value=10, step=1)
-                additional_k = st.number_input("Additional K-value (lint collector, etc.)", min_value=0.0, max_value=10.0, value=0.0, step=0.1)
+                use_ilc_connector = st.checkbox("Add LF Systems ILC Lint Collector", value=False, key=f"ilc_conn_{len(st.session_state.dryers)}")
+                if use_ilc_connector:
+                    st.info("✓ ILC K-value (1.25) will be added to connector")
             
             with col3:
                 st.markdown("**Connector Fittings**")
@@ -982,9 +1222,12 @@ def show_dryer_input_screen():
                     num_30_elbows * K_VALUES["30° Elbow"] +
                     num_lateral_tees * K_VALUES["Lateral Tee"] +
                     K_VALUES["Entry (flush)"] +
-                    K_VALUES["Exit"] +
-                    additional_k
+                    K_VALUES["Exit"]
                 )
+                
+                # Add ILC if checked
+                if use_ilc_connector:
+                    k_total += K_VALUES["ILC Lint Collector"]
                 
                 # Create fittings summary
                 fittings = []
@@ -997,6 +1240,8 @@ def show_dryer_input_screen():
                 if num_lateral_tees > 0:
                     fittings.append(f"{num_lateral_tees}x Lateral Tee")
                 fittings.append("Entry + Exit")
+                if use_ilc_connector:
+                    fittings.append("ILC Lint Collector")
                 fittings_summary = ", ".join(fittings)
                 
                 # Calculate velocity and pressure loss
@@ -1008,7 +1253,7 @@ def show_dryer_input_screen():
                     'cfm': cfm,
                     'outlet_diameter': outlet_diameter,
                     'connector_length': connector_length,
-                    'additional_k': additional_k,
+                    'has_ilc': use_ilc_connector,
                     'total_k': k_total,
                     'connector_fittings_summary': fittings_summary,
                     'connector_velocity': velocity,
@@ -1050,6 +1295,12 @@ def show_manifold_input_screen():
     total_cfm = sum(d['cfm'] for d in st.session_state.dryers)
     st.markdown(f"**Total System CFM:** {total_cfm} CFM")
     
+    # Design guideline note
+    st.info("""
+    📋 **Design Guideline:** The pressure loss in the manifold between the first and last dryer 
+    connection should not exceed 0.10" WC to ensure balanced flow distribution across all dryers.
+    """)
+    
     # Optimization choice outside form for dynamic update
     st.subheader("Manifold Configuration")
     optimize_diameter = st.checkbox("✅ Optimize manifold diameter automatically (target 0.5 IN WC max)", value=True, key="opt_check")
@@ -1087,7 +1338,16 @@ def show_manifold_input_screen():
             num_45_elbows = st.number_input("45° Elbows", min_value=0, max_value=20, value=0, step=1, key="m_45")
             num_30_elbows = st.number_input("30° Elbows", min_value=0, max_value=20, value=0, step=1, key="m_30")
             num_lateral_tees = st.number_input("Lateral Tees (change of direction only)", min_value=0, max_value=20, value=0, step=1, key="m_tee")
-            additional_k_manifold = st.number_input("Additional K-value (lint collector, etc.)", min_value=0.0, max_value=10.0, value=0.0, step=0.1, key="m_addk")
+            use_ilc_manifold = st.checkbox("Add LF Systems ILC Lint Collector in manifold", value=False, key="ilc_manifold")
+            if use_ilc_manifold:
+                st.info("✓ ILC K-value (1.25) will be added to manifold")
+        
+        # Supply Air Fan Option (outside col2 but inside form)
+        st.markdown("---")
+        st.markdown("**Supply Air Fan (Optional)**")
+        use_supply_fan = st.checkbox("Include Supply Air Fan (matches exhaust fan model)", value=False, key="supply_fan")
+        if use_supply_fan:
+            st.info("✓ Supply air fan will match exhaust fan model\n\n✓ Controller will be L150.LS (with supply fan control)")
         
         submitted = st.form_submit_button("Calculate System ➡️", type="primary")
         
@@ -1099,9 +1359,12 @@ def show_manifold_input_screen():
                 num_30_elbows * K_VALUES["30° Elbow"] +
                 num_lateral_tees * K_VALUES["Lateral Tee"] +
                 K_VALUES["Entry (flush)"] +
-                K_VALUES["Exit"] +
-                additional_k_manifold
+                K_VALUES["Exit"]
             )
+            
+            # Add ILC if checked
+            if use_ilc_manifold:
+                k_total_manifold += K_VALUES["ILC Lint Collector"]
             
             # Create fittings summary
             fittings = []
@@ -1114,6 +1377,8 @@ def show_manifold_input_screen():
             if num_lateral_tees > 0:
                 fittings.append(f"{num_lateral_tees}x Lateral Tee")
             fittings.append("Entry + Exit")
+            if use_ilc_manifold:
+                fittings.append("ILC Lint Collector")
             fittings_summary = ", ".join(fittings)
             
             # Optimize or use specified diameter
@@ -1130,7 +1395,7 @@ def show_manifold_input_screen():
                 'diameter': manifold_diameter,
                 'optimize': optimize_diameter,
                 'fittings_summary': fittings_summary,
-                'additional_k': additional_k_manifold,
+                'has_ilc': use_ilc_manifold,
                 'total_k': k_total_manifold
             }
             
@@ -1149,7 +1414,8 @@ def show_manifold_input_screen():
                 'manifold_total_k': k_total_manifold,
                 'total_system_dp': total_system_dp,
                 'suitable_fans': suitable_fans,
-                'selected_fan': suitable_fans[0] if suitable_fans else None
+                'selected_fan': suitable_fans[0] if suitable_fans else None,
+                'has_supply_fan': use_supply_fan
             }
             
             st.session_state.step = 'results'
@@ -1249,6 +1515,72 @@ def show_results_screen():
     
     else:
         st.error("❌ No suitable DEF fan found for the system requirements. System pressure loss may be too high or CFM too low.")
+    
+    st.markdown("---")
+    
+    # ILC Lint Collector Selection
+    ilc_needed = False
+    ilc_models = []
+    
+    # Check if ILC is needed in manifold
+    if st.session_state.manifold_info.get('has_ilc', False):
+        ilc_needed = True
+        manifold_dia = st.session_state.manifold_info['diameter']
+        ilc_model = f"ILC{manifold_dia:02d}"
+        ilc_models.append(('manifold', ilc_model, manifold_dia))
+    
+    # Check if ILC is needed in any dryer connectors
+    for idx, dryer in enumerate(st.session_state.dryers, 1):
+        if dryer.get('has_ilc', False):
+            ilc_needed = True
+            conn_dia = dryer['outlet_diameter']
+            ilc_model = f"ILC{conn_dia:02d}"
+            ilc_models.append(('connector', ilc_model, conn_dia))
+    
+    if ilc_needed:
+        st.subheader("🔧 LF Systems ILC Inline Lint Collector(s)")
+        
+        # Group by model
+        ilc_counts = {}
+        for location, model, dia in ilc_models:
+            if model not in ilc_counts:
+                ilc_counts[model] = {'count': 0, 'diameter': dia, 'locations': []}
+            ilc_counts[model]['count'] += 1
+            ilc_counts[model]['locations'].append(location)
+        
+        for ilc_model, info in ilc_counts.items():
+            col1, col2 = st.columns([2, 1])
+            with col1:
+                st.success(f"**{ilc_model}** - {info['diameter']}\" diameter")
+                st.write(f"Quantity: {info['count']}")
+                locations_text = "Manifold" if 'manifold' in info['locations'] else ""
+                if 'connector' in info['locations']:
+                    conn_count = info['locations'].count('connector')
+                    if locations_text:
+                        locations_text += f" + {conn_count} connector(s)"
+                    else:
+                        locations_text = f"{conn_count} connector(s)"
+                st.write(f"Location(s): {locations_text}")
+            with col2:
+                st.info(f"K-value: 1.25\n\n800 micron filter\n\nTool-less access")
+    
+    st.markdown("---")
+    
+    # Supply Air Fan Selection
+    if results.get('has_supply_fan', False) and results['selected_fan']:
+        st.subheader("💨 Supply Air Fan")
+        
+        supply_fan_model = results['selected_fan']['model']
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            st.success(f"**Supply Air Fan:** {supply_fan_model}")
+            st.write(f"**Matches Exhaust Fan:** {supply_fan_model}")
+            st.write(f"**Capacity:** {results['selected_fan']['max_cfm']:.0f} CFM @ {results['selected_fan']['max_sp']:.2f}\" WC")
+            st.write(f"**Controller:** L150.LS (with supply fan control)")
+        
+        with col2:
+            st.info("✓ Matched to exhaust\n\n✓ L150.LS controller\n\n✓ Integrated control")
     
     st.markdown("---")
     
