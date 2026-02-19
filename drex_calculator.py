@@ -154,39 +154,45 @@ def get_rep_info_by_state(state_abbr):
         # Get the first rep info for this state
         rep_info_raw = state_rows.iloc[0]['info']
         
-        # Parse the HTML-like rep info
-        lines = rep_info_raw.split('\\n')
+        # Parse the rep info - data is one big string with embedded newlines
+        import re
+        
         rep_type = ""
         company = ""
-        address = ""
+        address_parts = []
         phone = ""
         website = ""
         
+        # Split on actual newlines
+        lines = [l.strip() for l in rep_info_raw.split('\n') if l.strip()]
+        
         for i, line in enumerate(lines):
-            line = line.strip()
-            if '<strong>REPRESENTATIVE</strong>' in line or '<strong>DISTRIBUTOR</strong>' in line:
-                rep_type = "REPRESENTATIVE" if "REPRESENTATIVE" in line else "DISTRIBUTOR"
-            elif i == 1 and line:  # Company name is typically second line
-                company = line
-            elif 'href=' in line:  # Website
-                # Extract URL from <a> tag
-                import re
+            if '<strong>REPRESENTATIVE</strong>' in line:
+                rep_type = "REPRESENTATIVE"
+            elif '<strong>DISTRIBUTOR</strong>' in line:
+                rep_type = "DISTRIBUTOR"
+            elif '<a href=' in line:  # Website
                 match = re.search(r'href="([^"]+)"', line)
                 if match:
                     website = match.group(1)
-            elif line and not line.startswith('<'):
-                # Check if it's a phone number
-                if any(char.isdigit() for char in line) and '-' in line and len(line) < 20:
+            elif not line.startswith('<') and line:
+                # Not an HTML tag
+                # Check if it looks like a phone number
+                if re.search(r'\d{3}[-.]?\d{3}[-.]?\d{4}', line):
                     phone = line
-                elif line and not phone and not website:  # Address lines
-                    address += line + "\\n"
+                elif not company:  # First non-tag line is company name
+                    company = line
+                else:  # Everything else is address
+                    address_parts.append(line)
+        
+        address = ', '.join(address_parts)
         
         return {
             'type': rep_type,
-            'company': company.strip(),
-            'address': address.strip(),
-            'phone': phone.strip(),
-            'website': website.strip()
+            'company': company,
+            'address': address,
+            'phone': phone,
+            'website': website
         }
         
     except Exception as e:
@@ -836,6 +842,35 @@ def generate_csi_specification(project_info, dryers, manifold_info, results):
     for comp in components:
         comp_p = doc.add_paragraph(style='List Number')
         comp_p.add_run(comp)
+    
+    # Add manufacturer contact information
+    doc.add_paragraph()
+    contact_p = doc.add_paragraph()
+    contact_p.add_run("B. Manufacturer Contact Information:")
+    contact_p.runs[0].bold = True
+    
+    # LF Systems corporate
+    corp_p = doc.add_paragraph()
+    corp_p.add_run("LF Systems by RM Manifold Group Inc.\n")
+    corp_p.runs[0].bold = True
+    corp_p.add_run("Website: www.lfsystems.net\n")
+    corp_p.add_run("Phone: (817) 393-4029\n")
+    corp_p.add_run("Email: info@lfsystems.net")
+    
+    # Add local representative
+    rep_info = get_rep_info_by_state(project_info.get('state', ''))
+    if rep_info:
+        doc.add_paragraph()
+        local_p = doc.add_paragraph()
+        local_p.add_run(f"Local {rep_info['type']}:\n")
+        local_p.runs[0].bold = True
+        local_p.add_run(f"{rep_info['company']}\n")
+        local_p.runs[1].bold = True
+        local_p.add_run(f"{rep_info['address']}\n")
+        local_p.add_run(f"Phone: {rep_info['phone']}\n")
+        if rep_info['website']:
+            local_p.add_run(f"Website: {rep_info['website']}")
+    
     # 2.02 EXHAUST FAN DESCRIPTION
     doc.add_heading("2.02 DESCRIPTION, INLINE DRYER EXHAUST FAN", level=2)
     fan_desc = [
